@@ -9,10 +9,42 @@
 <body>
     <!-- 
         Admin panel for managing operation-water-rock content.
-        This page allows administrators to view and manage dares data.
+        SECURITY: This page requires admin authentication.
     -->
     
-    <main class="terminal-container">
+    <!-- Login prompt (shown initially) -->
+    <div id="adminLoginContainer" class="terminal-screen">
+        <div class="scanlines"></div>
+        <div class="flicker"></div>
+        <div class="terminal-content">
+            <div class="password-prompt-container">
+                <div class="password-header">
+                    operation water rock
+                </div>
+                <div class="password-prompt">
+                    <span class="prompt-symbol">&gt;</span>
+                    <span class="password-input-wrapper">
+                        <input 
+                            type="password" 
+                            id="adminPasswordInput" 
+                            class="password-input" 
+                            autocomplete="off"
+                            aria-label="Admin password"
+                            placeholder="Enter admin password..."
+                            autofocus
+                        />
+                        <span class="cursor-blink">█</span>
+                    </span>
+                </div>
+                <div id="adminLoginError" style="display: none; color: #ff0000; margin-top: 20px; text-shadow: 0 0 5px #ff0000;">
+                    ACCESS DENIED
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Admin panel (hidden until authenticated) -->
+    <main id="adminPanel" class="terminal-container" style="display: none;">
         <header class="terminal-header">
             <h1>OPERATION WATER ROCK</h1>
             <p class="subtitle">Admin Panel v1.0</p>
@@ -21,20 +53,10 @@
         <div class="terminal-window">
             <div class="terminal-output" id="adminOutput">
                 <!-- Admin interface will be dynamically inserted here -->
-                <div class="terminal-line">
-                    <span class="prompt">#</span> Admin panel initialized. Access granted.
-                </div>
             </div>
             
             <div class="admin-controls">
-                <!-- 
-                    TODO: Add admin controls:
-                    - View all dares
-                    - Add new dares
-                    - Edit existing dares
-                    - Delete dares
-                    - Export/import data
-                -->
+                <!-- Admin controls -->
             </div>
             
             <div class="terminal-input-container">
@@ -51,9 +73,10 @@
         
         <nav class="admin-nav">
             <a href="index.html">← Back to Main</a>
+            <button id="logoutBtn" style="background: transparent; border: 1px solid #ff0000; color: #ff0000; padding: 5px 10px; cursor: pointer; margin-left: 20px;">LOGOUT</button>
         </nav>
     </main>
     
-    <script src="js/admin.js"></script>
+    <script type="module" src="js/admin.js"></script>
 </body>
 </html>

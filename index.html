@@ -42,22 +42,6 @@
         </div>
     </div>
     
-    <script src="js/app.js"></script>
-    <script type="module">
-        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.13.0/firebase-app.js";
-        import { getFirestore, doc, onSnapshot, setDoc } from "https://www.gstatic.com/firebasejs/10.13.0/firebase-firestore.js";
-        import { firebaseConfig } from "./js/firebase-config.js";
-
-        const app = initializeApp(firebaseConfig);
-        const db = getFirestore(app);
-
-        // listen to admin state doc:
-        onSnapshot(doc(db, "admin/state"), (snap) => {
-            console.log("admin state:", snap.data());
-        });
-
-        // example write (admin side):
-        // await setDoc(doc(db, "admin/state"), { unlocked: true });
-    </script>
+    <script type="module" src="js/app.js"></script>
 </body>
 </html>

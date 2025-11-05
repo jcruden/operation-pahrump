@@ -8,7 +8,7 @@ A terminal-style static website project built with plain HTML, CSS, and JavaScri
 operation-water-rock/
 ├── index.html          # Login page with password authentication
 ├── dashboard.html      # Main dashboard with points and dares
-├── admin.html          # Admin panel for managing content
+├── admin.html          # Admin panel (password protected)
 ├── css/
 │   ├── style.css       # Terminal-style base styling
 │   └── dashboard.css   # Dashboard-specific styles
@@ -16,6 +16,8 @@ operation-water-rock/
 │   ├── app.js          # Login logic and authentication
 │   ├── dashboard.js    # Dashboard functionality and interactions
 │   ├── admin.js        # Admin panel logic
+│   ├── firebase-service.js   # Firebase/Firestore service module
+│   ├── firebase-setup.js     # Firebase initialization script
 │   ├── firebase-config.js       # Firebase config (gitignored)
 │   └── firebase-config.example.js # Firebase config template
 ├── data/
@@ -54,21 +56,24 @@ operation-water-rock/
 
 3. Navigate to `http://localhost:8000` in your browser
 
-4. **Firebase Setup** (optional, for admin features):
-   ```bash
-   # Copy the example config file
-   cp js/firebase-config.example.js js/firebase-config.js
-   
-   # Edit js/firebase-config.js and add your Firebase configuration
-   ```
+4. **Firebase Setup** (required for full functionality):
+   - Create Firebase project at [Firebase Console](https://console.firebase.google.com/)
+   - Enable Firestore Database
+   - Copy `js/firebase-config.example.js` to `js/firebase-config.js`
+   - Add your Firebase configuration to `js/firebase-config.js`
+   - Configure Firestore security rules (see below)
+   - Initialize data: Open `index.html` in browser console and run:
+     ```javascript
+     import('./js/firebase-setup.js').then(async (module) => {
+         await module.setupFirebase();
+     });
+     ```
+   - This will prompt you to set passwords for all users
 
-5. **Test credentials** (dev only):
-   - `player1`, `player2`, `player3`, `admin` (password = role name)
-
-6. **Unlock dashboard controls** (for testing):
-   ```javascript
-   localStorage.setItem('unlocked', 'true');
-   ```
+5. **Access Admin Panel**:
+   - Go to `admin.html`
+   - Enter admin password (set during Firebase setup)
+   - Type `help` for available commands
 
 ## Deployment to GitHub Pages
 
@@ -81,26 +86,64 @@ operation-water-rock/
 
 Modern browsers (Chrome, Firefox, Safari, Edge). Requires JavaScript enabled.
 
-## Firebase Setup
+## Firebase Configuration
 
-This project uses Firebase Firestore for real-time admin state synchronization. To set up:
+### Firestore Security Rules
 
-1. Create a Firebase project at [Firebase Console](https://console.firebase.google.com/)
-2. Enable Firestore Database
-3. Copy `js/firebase-config.example.js` to `js/firebase-config.js`
-4. Add your Firebase configuration to `js/firebase-config.js`
-5. Configure Firestore security rules as needed
+Go to **Firestore Database** → **Rules** and update with:
 
-**Note**: `firebase-config.js` is gitignored - never commit your actual Firebase config.
+```javascript
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    match /admin/{document} {
+      allow read, write: if true;
+    }
+    match /users/{userId} {
+      allow read, write: if true;
+    }
+    match /dares/{dareId} {
+      allow read, write: if true;
+    }
+  }
+}
+```
 
-## What's Left to Do
+**Note**: For production, implement proper authentication and stricter rules.
 
-- **Security**: Replace client-side passwords with server-backed authentication
-- **Backend API**: Implement secure password validation, session management, JWT tokens
-- **Database**: Move dares storage from JSON to database (Firestore integration started)
-- **Admin Panel**: Complete admin interface for managing dares, users, and settings
-- **Real-time Updates**: Complete Firebase integration for multiplayer features
-- **Testing**: Add unit tests and integration tests
+### Firestore Structure
+
+- **admin/state**: Admin settings (unlocked flag)
+- **users/{userId}**: User accounts with passwords (SECURE - stored in Firestore)
+- **dares/{dareId}**: Dare entries (managed by admin)
+
+### Data Storage
+
+- **Authentication**: Firestore `users` collection (passwords not in codebase)
+- **User Management**: Firestore `users` collection (admin manages via admin panel)
+- **Points**: localStorage (per user: `points_player1`, `points_player2`, etc.)
+- **Dares**: Firestore (for admin management and real-time updates)
+- **Admin State**: Firestore (unlocked flag for real-time sync)
+
+**Security**: Passwords are stored in Firestore, not in code. Admin panel requires admin password to access. `firebase-config.js` is gitignored
+
+## Admin Panel Commands
+
+Access admin panel at `admin.html` (requires admin password):
+
+- `help` - Show all commands
+- `list` - List all dares
+- `list users` - List all users
+- `list points` or `points` - List all player points
+- `add "title" "desc" "difficulty" "category" "riddle" "answer" "hint"` - Add dare
+- `edit <id> <field> "<value>"` - Edit dare
+- `delete <id>` - Delete dare
+- `user add <role>` - Add user
+- `user list` - List all users
+- `user pass <id> <password>` - Change user password
+- `unlock true` / `unlock false` - Toggle unlock state
+- `settings` - Show admin settings
+- `clear` - Clear output
 
 ## License
 

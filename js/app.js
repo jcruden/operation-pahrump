@@ -3,24 +3,8 @@
  * Handles terminal interface with typewriter effect and password prompt.
  */
 
-/**
- * SECURITY WARNING: Client-side password storage is for DEVELOPMENT/TESTING ONLY.
- * 
- * TODO: Replace this with server-backed authentication:
- * - Move password validation to secure backend API
- * - Use proper session management (JWT tokens, secure cookies)
- * - Implement password hashing (bcrypt, argon2, etc.)
- * - Add rate limiting to prevent brute force attacks
- * - Use HTTPS in production
- * - Never store passwords in client-side code in production
- */
-const PASSWORD_CONFIG = {
-    // Dev/test passwords - REMOVE before production deployment
-    player1: 'player1',
-    player2: 'player2',
-    player3: 'player3',
-    admin: 'admin'
-};
+// Import Firebase service (only for admin state subscription)
+import { validatePassword, subscribeToAdminState } from './firebase-service.js';
 
 // Initialize the application when DOM is loaded
 document.addEventListener('DOMContentLoaded', function() {
@@ -120,28 +104,11 @@ document.addEventListener('DOMContentLoaded', function() {
         }, 3000);
     }
     
-    // Validate password and determine role
-    function validatePassword(password) {
-        // TODO: Replace with server-side authentication API call
-        // Example: const response = await fetch('/api/auth/login', { method: 'POST', body: JSON.stringify({ password }) });
-        // TODO: Implement proper error handling and security measures
-        
-        for (const [role, pass] of Object.entries(PASSWORD_CONFIG)) {
-            if (password === pass) {
-                return role;
-            }
-        }
-        return null;
-    }
-    
     // Redirect to dashboard with role and token
-    function redirectToDashboard(role) {
-        // TODO: Replace URL token with proper server-issued session token
-        // TODO: Implement secure token generation and validation
-        // TODO: Use HTTPS for all redirects in production
-        
-        const token = role; // Temporary: using role as token for dev/test
-        window.location.href = `dashboard.html?role=${role}&rid=${token}`;
+    function redirectToDashboard(userInfo) {
+        // Store user info in sessionStorage for dashboard
+        sessionStorage.setItem('userInfo', JSON.stringify(userInfo));
+        window.location.href = `dashboard.html?role=${userInfo.role}&rid=${userInfo.userId}`;
     }
     
     // Handle password input
@@ -165,16 +132,21 @@ document.addEventListener('DOMContentLoaded', function() {
                 return; // Don't process empty passwords
             }
             
-            // Validate password and get role
-            const role = validatePassword(password);
-            
-            if (role) {
-                // Success: redirect to dashboard
-                redirectToDashboard(role);
-            } else {
-                // Failure: show access denied message
-                showAccessDenied();
-            }
+            // Validate password via Firebase
+            handleLogin(password);
+        }
+    }
+    
+    // Handle login with simple password validation
+    async function handleLogin(password) {
+        const userInfo = await validatePassword(password);
+        
+        if (userInfo) {
+            // Success: redirect to dashboard
+            redirectToDashboard(userInfo);
+        } else {
+            // Failure: show access denied message
+            showAccessDenied();
         }
     }
     

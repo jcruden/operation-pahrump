@@ -3,9 +3,17 @@
  * Handles dashboard UI, points management, and dare interactions.
  */
 
+// Import Firebase service (only for dares)
+import { 
+    getAllDares, 
+    subscribeToDares, 
+    subscribeToAdminState
+} from './firebase-service.js';
+
 // Dashboard state
 let dashboardState = {
     role: null,
+    userId: null,
     points: 0,
     unlocked: false,
     activeDares: [],
@@ -14,19 +22,35 @@ let dashboardState = {
 };
 
 // Initialize dashboard when DOM is loaded
-document.addEventListener('DOMContentLoaded', function() {
+document.addEventListener('DOMContentLoaded', async function() {
     // Read role from URL params
     const urlParams = new URLSearchParams(window.location.search);
     dashboardState.role = urlParams.get('role') || 'unknown';
+    dashboardState.userId = urlParams.get('rid') || dashboardState.role;
     
-    // Read unlocked status from localStorage
+    // Try to get user info from sessionStorage
+    try {
+        const userInfoStr = sessionStorage.getItem('userInfo');
+        if (userInfoStr) {
+            const userInfo = JSON.parse(userInfoStr);
+            dashboardState.userId = userInfo.userId || dashboardState.userId;
+        }
+    } catch (e) {
+        console.error("Error reading user info:", e);
+    }
+    
+    // Initialize unlocked status from localStorage
     dashboardState.unlocked = localStorage.getItem('unlocked') === 'true';
     
-    // Initialize points from localStorage or default to 0
-    dashboardState.points = parseInt(localStorage.getItem('points') || '0', 10);
+    // Initialize points from localStorage (per user)
+    const pointsKey = `points_${dashboardState.userId}`;
+    dashboardState.points = parseInt(localStorage.getItem(pointsKey) || '0', 10);
     
     // Initialize dashboard
-    initializeDashboard();
+    await initializeDashboard();
+    
+    // Set up real-time subscriptions
+    setupRealtimeSubscriptions();
 });
 
 /**
@@ -42,7 +66,7 @@ async function initializeDashboard() {
     // Update button states
     updateButtonStates();
     
-    // Load dares
+    // Load dares (from Firestore if available, else JSON)
     await loadDares();
     
     // Render active dares
@@ -53,34 +77,53 @@ async function initializeDashboard() {
 }
 
 /**
- * Load dares from data/dares.json
+ * Set up real-time subscriptions
+ */
+function setupRealtimeSubscriptions() {
+    // Subscribe to dares changes
+    subscribeToDares((dares) => {
+        dashboardState.allDares = dares;
+        // Refresh active dares if needed
+        if (dashboardState.activeDares.length === 0 && dares.length > 0) {
+            dashboardState.activeDares = getRandomDares(5);
+            renderActiveDares();
+        }
+    });
+    
+    // Subscribe to admin state changes
+    subscribeToAdminState((state) => {
+        dashboardState.unlocked = state.unlocked || false;
+        localStorage.setItem('unlocked', dashboardState.unlocked.toString());
+        updateButtonStates();
+    });
+}
+
+/**
+ * Load dares from Firestore
  */
 async function loadDares() {
     try {
-        const response = await fetch('data/dares.json');
-        const data = await response.json();
-        dashboardState.allDares = data.dares || [];
+        dashboardState.allDares = await getAllDares();
         
         // Initialize active dares (first 5 or random if more than 5)
-        if (dashboardState.activeDares.length === 0) {
+        if (dashboardState.activeDares.length === 0 && dashboardState.allDares.length > 0) {
             dashboardState.activeDares = getRandomDares(5);
         }
     } catch (error) {
         console.error('Error loading dares:', error);
-        // Fallback to default dares
-        dashboardState.allDares = [
-            {
-                id: 1,
-                title: "Example Dare",
-                description: "This is an example dare entry",
-                difficulty: "easy",
-                category: "general",
-                riddle: "What has keys but no locks?",
-                answer: "piano",
-                hint: "It's a musical instrument"
+        // Fallback: try to load from JSON
+        try {
+            const response = await fetch('data/dares.json');
+            const data = await response.json();
+            dashboardState.allDares = data.dares || [];
+            if (dashboardState.activeDares.length === 0) {
+                dashboardState.activeDares = getRandomDares(5);
             }
-        ];
-        dashboardState.activeDares = dashboardState.allDares.slice(0, 5);
+        } catch (jsonError) {
+            console.error('Error loading dares from JSON:', jsonError);
+            dashboardState.allDares = [];
+            dashboardState.activeDares = [];
+        }
     }
 }
 
@@ -160,7 +203,9 @@ function escapeHtml(text) {
  */
 function updatePointsDisplay() {
     document.getElementById('pointsDisplay').textContent = dashboardState.points;
-    localStorage.setItem('points', dashboardState.points.toString());
+    // Store points in localStorage (per user)
+    const pointsKey = `points_${dashboardState.userId}`;
+    localStorage.setItem(pointsKey, dashboardState.points.toString());
 }
 
 /**

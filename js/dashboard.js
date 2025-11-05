@@ -98,7 +98,7 @@ function setupRealtimeSubscriptions() {
         dashboardState.allDares = dares;
         // Refresh active dares if needed
         if (dashboardState.activeDares.length === 0 && dares.length > 0) {
-            dashboardState.activeDares = getRandomDares(5);
+            dashboardState.activeDares = getRandomDares(3);
             renderActiveDares();
         }
     });
@@ -133,9 +133,9 @@ async function loadDares() {
     try {
         dashboardState.allDares = await getAllDares();
         
-        // Initialize active dares (first 5 or random if more than 5)
+        // Initialize active dares (first 3 or random if more than 3)
         if (dashboardState.activeDares.length === 0 && dashboardState.allDares.length > 0) {
-            dashboardState.activeDares = getRandomDares(5);
+            dashboardState.activeDares = getRandomDares(3);
         }
     } catch (error) {
         console.error('Error loading dares:', error);
@@ -145,7 +145,7 @@ async function loadDares() {
             const data = await response.json();
             dashboardState.allDares = data.dares || [];
             if (dashboardState.activeDares.length === 0) {
-                dashboardState.activeDares = getRandomDares(5);
+                dashboardState.activeDares = getRandomDares(3);
             }
         } catch (jsonError) {
             console.error('Error loading dares from JSON:', jsonError);
@@ -574,6 +574,27 @@ function handleConfirmComplete() {
     // Clear selection if this was selected
     if (dashboardState.selectedDare && dashboardState.selectedDare.index === index) {
         dashboardState.selectedDare = null;
+    }
+    
+    // Replace with a new random dare from the available dares list
+    if (dashboardState.allDares.length > 0) {
+        // Get dares that aren't already in activeDares
+        // Compare by id (Firestore document ID or data id field)
+        const usedIds = new Set(dashboardState.activeDares.map(d => d.id || d.challenge));
+        const availableDares = dashboardState.allDares.filter(d => {
+            const dareId = d.id || d.challenge;
+            return !usedIds.has(dareId);
+        });
+        
+        if (availableDares.length > 0) {
+            // Pick a random dare from available ones
+            const randomIndex = Math.floor(Math.random() * availableDares.length);
+            dashboardState.activeDares.push(availableDares[randomIndex]);
+        } else {
+            // If all dares are used, pick a random one from all dares
+            const randomIndex = Math.floor(Math.random() * dashboardState.allDares.length);
+            dashboardState.activeDares.push(dashboardState.allDares[randomIndex]);
+        }
     }
     
     // Re-render dares

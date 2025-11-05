@@ -397,8 +397,6 @@ body.dashboard-page {
         inset 0 0 40px rgba(255, 216, 107, 0.15),
         inset 0 0 80px rgba(212, 175, 55, 0.1),
         0 8px 16px rgba(0, 0, 0, 0.4);
-    max-height: 700px;
-    overflow-y: auto;
     position: relative;
 }
 
@@ -871,10 +869,6 @@ body.dashboard-page {
         font-size: 0.9rem;
     }
     
-    .dares-panel {
-        max-height: 500px;
-    }
-    
     .riddle-panel {
         margin-top: 0;
     }
@@ -893,20 +887,21 @@ body.dashboard-page {
 @media (max-width: 480px) {
     .dashboard-container {
         padding: 12px;
-        padding-top: 50px;
         padding-bottom: 25px;
-        /* Add safe area padding for iPhone notches */
-        padding-top: max(50px, env(safe-area-inset-top) + 30px);
-        padding-bottom: max(25px, env(safe-area-inset-bottom) + 15px);
-        padding-left: max(12px, env(safe-area-inset-left) + 8px);
-        padding-right: max(12px, env(safe-area-inset-right) + 8px);
+        /* Add safe area padding for iPhone notches - ensure top padding accounts for safe area */
+        padding-top: calc(60px + env(safe-area-inset-top));
+        padding-bottom: max(25px, calc(25px + env(safe-area-inset-bottom)));
+        padding-left: max(12px, calc(12px + env(safe-area-inset-left)));
+        padding-right: max(12px, calc(12px + env(safe-area-inset-right)));
     }
     
     .dashboard-header {
         padding: 20px 15px 15px 15px;
         margin-left: -12px;
         margin-right: -12px;
-        margin-top: calc(-1 * max(50px, env(safe-area-inset-top) + 30px));
+        /* Ensure header doesn't go above safe area */
+        margin-top: calc(-1 * (60px + env(safe-area-inset-top)));
+        padding-top: calc(20px + env(safe-area-inset-top));
     }
     
     .dashboard-title {

@@ -1,6 +1,6 @@
-// Firebase configuration
-// Copy this file to firebase-config.js and add your actual config values
-// firebase-config.js is gitignored to keep your keys private
+// Firebase configuration template
+// Firebase API keys are public by design - security comes from Firestore security rules
+// Copy this file to firebase-config.js if you want to override the config in firebase-service.js
 
 export const firebaseConfig = {
     apiKey: "YOUR_API_KEY_HERE",

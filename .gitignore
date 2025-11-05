@@ -19,9 +19,8 @@ yarn-error.log*
 # OS files
 Thumbs.db
 
-# Firebase config (contains API keys)
-# Never commit your actual Firebase configuration
-js/firebase-config.js
+# Local Firebase config override (optional - for local development overrides)
+# js/firebase-config.js
 
 # Local storage backups (may contain passwords)
 *.localstorage

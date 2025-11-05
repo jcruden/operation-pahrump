@@ -18,8 +18,7 @@ operation-water-rock/
 │   ├── admin.js        # Admin panel logic
 │   ├── firebase-service.js   # Firebase/Firestore service module
 │   ├── firebase-setup.js     # Firebase initialization script
-│   ├── firebase-config.js       # Firebase config (gitignored)
-│   └── firebase-config.example.js # Firebase config template
+│   └── firebase-config.example.js # Firebase config template (optional override)
 ├── data/
 │   └── dares.json      # Dares data with riddles, hints, and answers
 └── README.md           # This file
@@ -57,10 +56,10 @@ operation-water-rock/
 3. Navigate to `http://localhost:8000` in your browser
 
 4. **Firebase Setup** (required for full functionality):
+   - Firebase configuration is already included in `js/firebase-service.js`
+   - Firebase API keys are public by design - security comes from Firestore rules
    - Create Firebase project at [Firebase Console](https://console.firebase.google.com/)
    - Enable Firestore Database
-   - Copy `js/firebase-config.example.js` to `js/firebase-config.js`
-   - Add your Firebase configuration to `js/firebase-config.js`
    - Configure Firestore security rules (see below)
    - Initialize data: Open `index.html` in browser console and run:
      ```javascript
@@ -69,6 +68,7 @@ operation-water-rock/
      });
      ```
    - This will prompt you to set passwords for all users
+   - Optionally, you can override the Firebase config by copying `js/firebase-config.example.js` to `js/firebase-config.js` and modifying it
 
 5. **Access Admin Panel**:
    - Go to `admin.html`
@@ -125,7 +125,7 @@ service cloud.firestore {
 - **Dares**: Firestore (for admin management and real-time updates)
 - **Admin State**: Firestore (unlocked flag for real-time sync)
 
-**Security**: Passwords are stored in Firestore, not in code. Admin panel requires admin password to access. `firebase-config.js` is gitignored
+**Security**: Passwords are stored in Firestore, not in code. Admin panel requires admin password to access. Firebase API keys are public (security comes from Firestore security rules).
 
 ## Admin Panel Commands
 

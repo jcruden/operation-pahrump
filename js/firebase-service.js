@@ -19,15 +19,29 @@ import {
     onSnapshot,
     serverTimestamp 
 } from "https://www.gstatic.com/firebasejs/10.13.0/firebase-firestore.js";
-import { firebaseConfig } from "./firebase-config.js";
 
 // Initialize Firebase
 let app, db;
+
+// Firebase configuration - public API keys (security comes from Firestore rules)
+const firebaseConfig = {
+    apiKey: "AIzaSyDRmRxzBvc6zeoljr27OLZQq4z6XTI94Do",
+    authDomain: "operation-water-rock.firebaseapp.com",
+    projectId: "operation-water-rock",
+    storageBucket: "operation-water-rock.firebasestorage.app",
+    messagingSenderId: "484182731019",
+    appId: "1:484182731019:web:5afe081132f4fcb16fda0e",
+    measurementId: "G-9DFP9Z4K03"
+};
+
+// Initialize Firebase
 try {
     app = initializeApp(firebaseConfig);
     db = getFirestore(app);
 } catch (error) {
-    console.warn("Firebase not configured:", error);
+    console.error("Firebase initialization failed:", error);
+    db = null;
+    app = null;
 }
 
 /**
@@ -106,6 +120,12 @@ export async function getAllDares() {
  * Subscribe to dares changes (real-time)
  */
 export function subscribeToDares(callback) {
+    if (!db) {
+        console.warn("Firebase not configured - subscribeToDares not available");
+        callback([]);
+        return () => {}; // Return no-op unsubscribe function
+    }
+    
     const daresRef = collection(db, "dares");
     const q = query(daresRef, orderBy("id", "asc"));
     
@@ -174,6 +194,12 @@ export async function deleteDare(dareId) {
  * Subscribe to admin state changes
  */
 export function subscribeToAdminState(callback) {
+    if (!db) {
+        console.warn("Firebase not configured - subscribeToAdminState not available");
+        callback({ unlocked: false });
+        return () => {}; // Return no-op unsubscribe function
+    }
+    
     const adminStateRef = doc(db, "admin", "state");
     
     return onSnapshot(adminStateRef, (snapshot) => {

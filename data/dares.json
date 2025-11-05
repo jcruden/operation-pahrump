@@ -1,106 +1,66 @@
 {
-  "description": "Dares data for operation-water-rock",
+  "description": "Simple dares/challenges for operation-water-rock",
   "version": "1.0",
   "dares": [
     {
       "id": 1,
-      "title": "The Key Master",
-      "description": "Solve this riddle to unlock the next challenge",
-      "difficulty": "easy",
-      "category": "riddle",
-      "riddle": "What has keys but no locks?",
-      "answer": "piano",
-      "hint": "It's a musical instrument"
+      "challenge": "Take a picture in a fountain"
     },
     {
       "id": 2,
-      "title": "The Silent Runner",
-      "description": "Crack this code to proceed",
-      "difficulty": "medium",
-      "category": "riddle",
-      "riddle": "I speak without a mouth and hear without ears. I have no body, but I come alive with wind. What am I?",
-      "answer": "echo",
-      "hint": "Think about sound and reflection"
+      "challenge": "Do 10 push-ups"
     },
     {
       "id": 3,
-      "title": "The Time Keeper",
-      "description": "Answer correctly to gain access",
-      "difficulty": "easy",
-      "category": "riddle",
-      "riddle": "What has hands but cannot clap?",
-      "answer": "clock",
-      "hint": "You check it to know the time"
+      "challenge": "Sing a song in public"
     },
     {
       "id": 4,
-      "title": "The Invisible Guardian",
-      "description": "Solve this puzzle to advance",
-      "difficulty": "hard",
-      "category": "riddle",
-      "riddle": "I am taken from a mine and shut up in a wooden case from which I am never released, and yet I am used by almost everyone. What am I?",
-      "answer": "pencil",
-      "hint": "Graphite comes from mines, and it's used for writing"
+      "challenge": "Call a friend and tell them a joke"
     },
     {
       "id": 5,
-      "title": "The Eternal Flame",
-      "description": "Master this challenge",
-      "difficulty": "medium",
-      "category": "riddle",
-      "riddle": "The more you take, the more you leave behind. What am I?",
-      "answer": "footsteps",
-      "hint": "Think about walking"
+      "challenge": "Take a selfie with a stranger"
     },
     {
       "id": 6,
-      "title": "The Shadow Walker",
-      "description": "Prove your worth with this riddle",
-      "difficulty": "easy",
-      "category": "riddle",
-      "riddle": "What has a head, a tail, is brown, and has no legs?",
-      "answer": "penny",
-      "hint": "It's a form of currency"
+      "challenge": "Do 20 jumping jacks"
     },
     {
       "id": 7,
-      "title": "The Memory Keeper",
-      "description": "Unlock secrets with this answer",
-      "difficulty": "hard",
-      "category": "riddle",
-      "riddle": "I have cities, but no houses. I have mountains, but no trees. I have water, but no fish. What am I?",
-      "answer": "map",
-      "hint": "You use it to navigate"
+      "challenge": "Write a haiku about water"
     },
     {
       "id": 8,
-      "title": "The Crystal Seer",
-      "description": "Answer this to gain points",
-      "difficulty": "medium",
-      "category": "riddle",
-      "riddle": "What gets wetter as it dries?",
-      "answer": "towel",
-      "hint": "You use it after bathing"
+      "challenge": "Dance for 30 seconds"
     },
     {
       "id": 9,
-      "title": "The Light Bearer",
-      "description": "Solve to proceed",
-      "difficulty": "easy",
-      "category": "riddle",
-      "riddle": "What has to be broken before you can use it?",
-      "answer": "egg",
-      "hint": "It comes from chickens"
+      "challenge": "Take a picture of something green"
     },
     {
       "id": 10,
-      "title": "The Code Breaker",
-      "description": "Master this final challenge",
-      "difficulty": "hard",
-      "category": "riddle",
-      "riddle": "I am not alive, but I grow; I don't have lungs, but I need air; I don't have a mouth, but water kills me. What am I?",
-      "answer": "fire",
-      "hint": "It produces heat and light"
+      "challenge": "Tell someone a compliment"
+    },
+    {
+      "id": 11,
+      "challenge": "Do a cartwheel"
+    },
+    {
+      "id": 12,
+      "challenge": "Draw a picture of a rock"
+    },
+    {
+      "id": 13,
+      "challenge": "Take a picture of the sky"
+    },
+    {
+      "id": 14,
+      "challenge": "Say 'hello' to 5 people"
+    },
+    {
+      "id": 15,
+      "challenge": "Do 15 sit-ups"
     }
   ]
 }

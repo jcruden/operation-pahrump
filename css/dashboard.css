@@ -82,14 +82,28 @@ body.dashboard-page {
 /* Dashboard main content */
 .dashboard-main {
     display: grid;
-    grid-template-columns: 1fr 1fr;
+    grid-template-columns: 1fr 2fr;
     gap: 30px;
     margin-bottom: 30px;
+}
+
+.dashboard-left {
+    display: flex;
+    flex-direction: column;
+    gap: 30px;
 }
 
 @media (max-width: 968px) {
     .dashboard-main {
         grid-template-columns: 1fr;
+    }
+    
+    .dashboard-left {
+        order: 2;
+    }
+    
+    .dares-panel {
+        order: 1;
     }
 }
 
@@ -226,6 +240,9 @@ body.dashboard-page {
     border: 1px solid #00ff00;
     padding: 15px;
     transition: all 0.3s ease;
+    display: flex;
+    flex-direction: column;
+    gap: 15px;
 }
 
 .dare-item:hover {
@@ -233,11 +250,12 @@ body.dashboard-page {
     box-shadow: 0 0 10px rgba(0, 255, 0, 0.3);
 }
 
-.dare-item.selected {
-    border-color: #00ff00;
-    border-width: 2px;
-    background: rgba(0, 255, 0, 0.1);
-    box-shadow: 0 0 15px rgba(0, 255, 0, 0.5);
+.dare-challenge {
+    color: #00ff00;
+    font-size: clamp(1rem, 1.5vw, 1.2rem);
+    line-height: 1.5;
+    text-shadow: 0 0 5px #00ff00;
+    flex: 1;
 }
 
 .dare-header {
@@ -317,36 +335,113 @@ body.dashboard-page {
 .dare-actions {
     display: flex;
     gap: 10px;
-    flex-wrap: wrap;
 }
 
 .dare-action-btn {
+    flex: 1;
     background: transparent;
     border: 1px solid #00ff00;
     color: #00ff00;
-    padding: 6px 12px;
+    padding: 10px 15px;
     font-family: 'Courier New', 'Monaco', 'Menlo', 'Consolas', monospace;
-    font-size: 0.8rem;
+    font-size: clamp(0.8rem, 1.3vw, 0.95rem);
     text-transform: uppercase;
+    letter-spacing: 0.05em;
     cursor: pointer;
     transition: all 0.3s ease;
-    text-shadow: 0 0 3px #00ff00;
+    text-shadow: 0 0 5px #00ff00;
 }
 
 .dare-action-btn:hover {
-    background: rgba(0, 255, 0, 0.2);
-    box-shadow: 0 0 8px rgba(0, 255, 0, 0.5);
+    background: rgba(0, 255, 0, 0.1);
+    box-shadow: 0 0 10px rgba(0, 255, 0, 0.4);
 }
 
-.dare-action-btn.danger {
+.dare-action-btn.complete {
+    border-color: #00ff00;
+    color: #00ff00;
+}
+
+.dare-action-btn.trash {
     border-color: #ff0000;
     color: #ff0000;
-    text-shadow: 0 0 3px #ff0000;
+    text-shadow: 0 0 5px #ff0000;
 }
 
-.dare-action-btn.danger:hover {
-    background: rgba(255, 0, 0, 0.2);
-    box-shadow: 0 0 8px rgba(255, 0, 0, 0.5);
+.dare-action-btn.trash:hover {
+    background: rgba(255, 0, 0, 0.1);
+    box-shadow: 0 0 10px rgba(255, 0, 0, 0.4);
+}
+
+/* Riddle panel */
+.riddle-panel {
+    background: rgba(0, 255, 0, 0.05);
+    border: 1px solid #00ff00;
+    padding: 20px;
+    box-shadow: 0 0 10px rgba(0, 255, 0, 0.2);
+}
+
+.riddle-box {
+    min-height: 150px;
+    margin-bottom: 20px;
+    padding: 15px;
+    background: rgba(0, 0, 0, 0.3);
+    border: 1px solid #00ff00;
+}
+
+.riddle-content {
+    color: #00ff00;
+    font-size: clamp(1rem, 1.5vw, 1.3rem);
+    line-height: 1.6;
+    text-shadow: 0 0 5px #00ff00;
+    margin-bottom: 10px;
+}
+
+.riddle-hint {
+    color: #ffff00;
+    font-size: clamp(0.9rem, 1.3vw, 1.1rem);
+    line-height: 1.6;
+    text-shadow: 0 0 5px #ffff00;
+    margin-top: 15px;
+    padding-top: 15px;
+    border-top: 1px solid #ffff00;
+    font-style: italic;
+}
+
+.riddle-actions {
+    display: flex;
+    gap: 10px;
+}
+
+.riddle-btn {
+    flex: 1;
+    background: transparent;
+    border: 2px solid #00ff00;
+    color: #00ff00;
+    padding: 12px 20px;
+    font-family: 'Courier New', 'Monaco', 'Menlo', 'Consolas', monospace;
+    font-size: clamp(0.9rem, 1.5vw, 1.1rem);
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    transition: all 0.3s ease;
+    text-shadow: 0 0 5px #00ff00;
+}
+
+.riddle-btn:hover:not(:disabled) {
+    background: rgba(0, 255, 0, 0.1);
+    box-shadow: 0 0 15px rgba(0, 255, 0, 0.5);
+}
+
+.riddle-btn.locked {
+    opacity: 0.5;
+    cursor: not-allowed;
+    border-color: #666;
+    color: #666;
 }
 
 .no-dares {
@@ -388,6 +483,15 @@ body.dashboard-page {
     margin-bottom: 20px;
     text-shadow: 0 0 5px #00ff00;
     text-align: center;
+}
+
+.modal-message {
+    color: #00ff00;
+    font-size: 1rem;
+    text-align: center;
+    margin-bottom: 20px;
+    text-shadow: 0 0 3px #00ff00;
+    line-height: 1.6;
 }
 
 .modal-input {
@@ -543,6 +647,19 @@ body.dashboard-page {
     
     .dares-panel {
         max-height: 500px;
+    }
+    
+    .riddle-panel {
+        margin-top: 0;
+    }
+    
+    .riddle-box {
+        min-height: 120px;
+    }
+    
+    .riddle-btn {
+        padding: 10px 15px;
+        font-size: 0.85rem;
     }
     
     .dashboard-message {

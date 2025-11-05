@@ -7,7 +7,9 @@
 import { 
     getAllDares, 
     subscribeToDares, 
-    subscribeToAdminState
+    subscribeToAdminState,
+    getAllRiddles,
+    subscribeToRiddles
 } from './firebase-service.js';
 
 // Dashboard state
@@ -18,7 +20,12 @@ let dashboardState = {
     unlocked: false,
     activeDares: [],
     allDares: [],
-    selectedDare: null
+    selectedDare: null,
+    currentRiddle: null,
+    currentRiddleIndex: 0,
+    riddles: [],
+    riddleHintShown: false,
+    pendingDareIndex: null  // Track which dare is pending confirmation
 };
 
 // Initialize dashboard when DOM is loaded
@@ -69,8 +76,14 @@ async function initializeDashboard() {
     // Load dares (from Firestore if available, else JSON)
     await loadDares();
     
+    // Load riddles
+    await loadRiddles();
+    
     // Render active dares
     renderActiveDares();
+    
+    // Render riddle
+    renderRiddle();
     
     // Set up event listeners
     setupEventListeners();
@@ -87,6 +100,21 @@ function setupRealtimeSubscriptions() {
         if (dashboardState.activeDares.length === 0 && dares.length > 0) {
             dashboardState.activeDares = getRandomDares(5);
             renderActiveDares();
+        }
+    });
+    
+    // Subscribe to riddles changes
+    subscribeToRiddles((riddles) => {
+        const sortedRiddles = [...riddles].sort((a, b) => (a.id || 0) - (b.id || 0));
+        dashboardState.riddles = sortedRiddles;
+        // If current riddle index is out of bounds, reset it
+        if (dashboardState.currentRiddleIndex >= sortedRiddles.length) {
+            dashboardState.currentRiddleIndex = 0;
+        }
+        // Refresh current riddle if we don't have one
+        if (!dashboardState.currentRiddle && sortedRiddles.length > 0) {
+            dashboardState.currentRiddle = getNextRiddle();
+            renderRiddle();
         }
     });
     
@@ -128,6 +156,104 @@ async function loadDares() {
 }
 
 /**
+ * Load riddles from Firestore (with JSON fallback)
+ */
+async function loadRiddles() {
+    try {
+        // Try Firebase first
+        dashboardState.riddles = await getAllRiddles();
+        // Sort riddles by id to ensure order
+        dashboardState.riddles.sort((a, b) => (a.id || 0) - (b.id || 0));
+        dashboardState.currentRiddleIndex = 0;
+    } catch (error) {
+        console.error('Error loading riddles from Firebase:', error);
+        // Fallback: try to load from JSON
+        try {
+            const response = await fetch('data/riddles.json');
+            const data = await response.json();
+            dashboardState.riddles = data.riddles || [];
+            // Sort riddles by id to ensure order
+            dashboardState.riddles.sort((a, b) => (a.id || 0) - (b.id || 0));
+            dashboardState.currentRiddleIndex = 0;
+        } catch (jsonError) {
+            console.error('Error loading riddles from JSON:', jsonError);
+            // Fallback: use default riddles
+            dashboardState.riddles = [
+                {
+                    id: 1,
+                    riddle: "What has keys but no locks?",
+                    answer: "piano",
+                    hint: "It's a musical instrument"
+                },
+                {
+                    id: 2,
+                    riddle: "I speak without a mouth and hear without ears. I have no body, but I come alive with wind. What am I?",
+                    answer: "echo",
+                    hint: "Think about sound and reflection"
+                },
+                {
+                    id: 3,
+                    riddle: "What has hands but cannot clap?",
+                    answer: "clock",
+                    hint: "You check it to know the time"
+                }
+            ];
+            dashboardState.currentRiddleIndex = 0;
+        }
+    }
+}
+
+/**
+ * Get next riddle in order
+ */
+function getNextRiddle() {
+    if (dashboardState.riddles.length === 0) return null;
+    if (dashboardState.currentRiddleIndex >= dashboardState.riddles.length) {
+        // All riddles completed, reset to start
+        dashboardState.currentRiddleIndex = 0;
+    }
+    return dashboardState.riddles[dashboardState.currentRiddleIndex];
+}
+
+/**
+ * Render riddle
+ */
+function renderRiddle() {
+    const riddleContent = document.getElementById('riddleContent');
+    const riddleHint = document.getElementById('riddleHint');
+    const hintBtn = document.getElementById('hintBtn');
+    const enterAnswerBtn = document.getElementById('enterAnswerBtn');
+    
+    if (!dashboardState.unlocked) {
+        riddleContent.textContent = 'COME BACK LATER';
+        riddleHint.style.display = 'none';
+        hintBtn.disabled = true;
+        enterAnswerBtn.disabled = true;
+        dashboardState.currentRiddle = null;
+        dashboardState.riddleHintShown = false;
+        return;
+    }
+    
+    // Get the next riddle in order if we don't have one
+    if (!dashboardState.currentRiddle) {
+        dashboardState.currentRiddle = getNextRiddle();
+    }
+    
+    if (dashboardState.currentRiddle) {
+        riddleContent.textContent = dashboardState.currentRiddle.riddle;
+        riddleHint.style.display = 'none';
+        dashboardState.riddleHintShown = false;
+        hintBtn.disabled = false;
+        enterAnswerBtn.disabled = false;
+    } else {
+        riddleContent.textContent = 'COME BACK LATER';
+        riddleHint.style.display = 'none';
+        hintBtn.disabled = true;
+        enterAnswerBtn.disabled = true;
+    }
+}
+
+/**
  * Get random dares from all dares
  */
 function getRandomDares(count) {
@@ -162,27 +288,13 @@ function createDareElement(dare, index) {
     div.dataset.dareId = dare.id;
     div.dataset.dareIndex = index;
     
-    const title = dare.title || `Dare ${dare.id}`;
-    const description = dare.description || '';
-    const difficulty = dare.difficulty || 'unknown';
-    const category = dare.category || 'general';
+    const challenge = dare.challenge || dare.title || dare.description || `Dare ${dare.id}`;
     
     div.innerHTML = `
-        <div class="dare-header">
-            <span class="dare-number">#${index + 1}</span>
-            <span class="dare-title">${title}</span>
-            <span class="dare-difficulty difficulty-${difficulty}">${difficulty.toUpperCase()}</span>
-        </div>
-        <div class="dare-body">
-            <div class="dare-description">${description}</div>
-            ${dare.riddle ? `<div class="dare-riddle" style="display: none;" data-riddle="${escapeHtml(dare.riddle)}">RIDDLE: ${escapeHtml(dare.riddle)}</div>` : ''}
-            ${dare.hint ? `<div class="dare-hint" style="display: none;" data-hint="${escapeHtml(dare.hint)}">HINT: ${escapeHtml(dare.hint)}</div>` : ''}
-            <div class="dare-category">CATEGORY: ${category.toUpperCase()}</div>
-        </div>
+        <div class="dare-challenge">${escapeHtml(challenge)}</div>
         <div class="dare-actions">
-            <button class="dare-action-btn" data-action="select" data-index="${index}">SELECT</button>
-            <button class="dare-action-btn" data-action="request-hint" data-index="${index}">HINT</button>
-            <button class="dare-action-btn danger" data-action="complete" data-index="${index}">COMPLETE</button>
+            <button class="dare-action-btn complete" data-action="complete" data-index="${index}">COMPLETE (+10)</button>
+            <button class="dare-action-btn trash" data-action="trash" data-index="${index}">TRASH</button>
         </div>
     `;
     
@@ -212,35 +324,31 @@ function updatePointsDisplay() {
  * Update button states based on unlocked flag
  */
 function updateButtonStates() {
-    const buttons = document.querySelectorAll('.control-btn');
-    buttons.forEach(btn => {
+    // Update clue buttons
+    const riddleButtons = document.querySelectorAll('.riddle-btn');
+    riddleButtons.forEach(btn => {
         if (dashboardState.unlocked) {
             btn.classList.remove('locked');
             btn.disabled = false;
-            btn.querySelector('.btn-status').textContent = 'UNLOCKED';
         } else {
             btn.classList.add('locked');
             btn.disabled = true;
-            btn.querySelector('.btn-status').textContent = 'LOCKED';
         }
     });
+    
+    // Update riddle display
+    renderRiddle();
 }
 
 /**
  * Set up event listeners
  */
 function setupEventListeners() {
-    // Complete dare button
-    document.getElementById('completeDareBtn').addEventListener('click', handleCompleteDare);
-    
-    // Next hint button
-    document.getElementById('nextHintBtn').addEventListener('click', handleNextHint);
+    // Clue hint button
+    document.getElementById('hintBtn').addEventListener('click', handleRiddleHint);
     
     // Enter answer button
     document.getElementById('enterAnswerBtn').addEventListener('click', handleEnterAnswer);
-    
-    // Trash all dares button
-    document.getElementById('trashAllBtn').addEventListener('click', handleTrashAllDares);
     
     // Dare action buttons (delegated)
     document.getElementById('daresList').addEventListener('click', handleDareAction);
@@ -248,6 +356,18 @@ function setupEventListeners() {
     // Answer modal buttons
     document.getElementById('submitAnswerBtn').addEventListener('click', handleSubmitAnswer);
     document.getElementById('cancelAnswerBtn').addEventListener('click', closeAnswerModal);
+    
+    // Complete dare modal buttons
+    document.getElementById('confirmCompleteBtn').addEventListener('click', handleConfirmComplete);
+    document.getElementById('cancelCompleteBtn').addEventListener('click', closeCompleteModal);
+    
+    // Trash dare modal buttons
+    document.getElementById('confirmTrashBtn').addEventListener('click', handleConfirmTrash);
+    document.getElementById('cancelTrashBtn').addEventListener('click', closeTrashModal);
+    
+    // Hint modal buttons
+    document.getElementById('confirmHintBtn').addEventListener('click', handleConfirmHint);
+    document.getElementById('cancelHintBtn').addEventListener('click', closeHintModal);
     
     // Handle Enter key in answer input
     document.getElementById('answerInput').addEventListener('keypress', function(e) {
@@ -258,55 +378,78 @@ function setupEventListeners() {
 }
 
 /**
- * Handle complete dare action
+ * Show hint modal
  */
-function handleCompleteDare() {
-    if (!dashboardState.unlocked) return;
-    if (!dashboardState.selectedDare) {
-        showMessage('Please select a dare first', 'error');
-        return;
-    }
-    
-    const dareIndex = dashboardState.selectedDare.index;
-    const dare = dashboardState.activeDares[dareIndex];
-    
-    // Award points
-    dashboardState.points += 10;
-    updatePointsDisplay();
-    
-    // Remove dare
-    dashboardState.activeDares.splice(dareIndex, 1);
-    dashboardState.selectedDare = null;
-    
-    // Re-render dares
-    renderActiveDares();
-    
-    showMessage(`Dare completed! +10 points`, 'success');
+function showHintModal() {
+    const modal = document.getElementById('hintModal');
+    modal.style.display = 'flex';
 }
 
 /**
- * Handle next hint action
+ * Close hint modal
  */
-function handleNextHint() {
+function closeHintModal() {
+    const modal = document.getElementById('hintModal');
+    modal.style.display = 'none';
+}
+
+/**
+ * Handle confirm hint action
+ */
+function handleConfirmHint() {
     if (!dashboardState.unlocked) return;
-    if (!dashboardState.selectedDare) {
-        showMessage('Please select a dare first', 'error');
+    if (!dashboardState.currentRiddle) {
+        showMessage('No riddle available', 'error');
+        closeHintModal();
         return;
     }
     
-    const dareIndex = dashboardState.selectedDare.index;
-    const dare = dashboardState.activeDares[dareIndex];
-    
-    // Reveal hint if available
-    const dareElement = document.querySelector(`[data-dare-index="${dareIndex}"]`);
-    const hintElement = dareElement.querySelector('.dare-hint');
-    
-    if (hintElement) {
-        hintElement.style.display = 'block';
-        showMessage('Hint revealed', 'info');
-    } else {
-        showMessage('No hint available for this dare', 'error');
+    // Check if hint is already shown
+    if (dashboardState.riddleHintShown) {
+        showMessage('Hint already shown', 'info');
+        closeHintModal();
+        return;
     }
+    
+    // Deduct points for hint
+    dashboardState.points -= 30;
+    updatePointsDisplay();
+    
+    // Show hint
+    const riddleHint = document.getElementById('riddleHint');
+    if (dashboardState.currentRiddle.hint) {
+        riddleHint.textContent = `HINT: ${dashboardState.currentRiddle.hint}`;
+        riddleHint.style.display = 'block';
+        dashboardState.riddleHintShown = true;
+        closeHintModal();
+        showMessage('Hint revealed. -30 points', 'info');
+    } else {
+        showMessage('No hint available for this riddle', 'error');
+        closeHintModal();
+        // Refund points if no hint available
+        dashboardState.points += 30;
+        updatePointsDisplay();
+    }
+}
+
+/**
+ * Handle clue hint action
+ */
+function handleRiddleHint() {
+    if (!dashboardState.unlocked) return;
+    if (!dashboardState.currentRiddle) {
+        showMessage('No riddle available', 'error');
+        return;
+    }
+    
+    // Check if hint is already shown
+    if (dashboardState.riddleHintShown) {
+        showMessage('Hint already shown', 'info');
+        return;
+    }
+    
+    // Show hint confirmation modal
+    showHintModal();
 }
 
 /**
@@ -314,8 +457,8 @@ function handleNextHint() {
  */
 function handleEnterAnswer() {
     if (!dashboardState.unlocked) return;
-    if (!dashboardState.selectedDare) {
-        showMessage('Please select a dare first', 'error');
+    if (!dashboardState.currentRiddle) {
+        showMessage('No riddle available', 'error');
         return;
     }
     
@@ -336,30 +479,34 @@ function handleSubmitAnswer() {
         return;
     }
     
-    const dareIndex = dashboardState.selectedDare.index;
-    const dare = dashboardState.activeDares[dareIndex];
-    
-    // Subtract points
-    dashboardState.points -= 5;
-    if (dashboardState.points < 0) dashboardState.points = 0;
-    updatePointsDisplay();
+    if (!dashboardState.currentRiddle) {
+        showMessage('No riddle available', 'error');
+        closeAnswerModal();
+        return;
+    }
     
     // Check correctness
-    const correctAnswer = (dare.answer || '').toLowerCase();
+    const correctAnswer = (dashboardState.currentRiddle.answer || '').toLowerCase();
     const isCorrect = answer === correctAnswer;
     
     closeAnswerModal();
     
     if (isCorrect) {
         showMessage('CORRECT! Answer accepted.', 'success');
-        // Optionally reveal riddle if available
-        const dareElement = document.querySelector(`[data-dare-index="${dareIndex}"]`);
-        const riddleElement = dareElement.querySelector('.dare-riddle');
-        if (riddleElement) {
-            riddleElement.style.display = 'block';
-        }
+        // Award points for correct riddle answer
+        dashboardState.points += 50;
+        updatePointsDisplay();
+        
+        // Move to next riddle in order
+        dashboardState.currentRiddleIndex++;
+        dashboardState.currentRiddle = getNextRiddle();
+        dashboardState.riddleHintShown = false;
+        renderRiddle();
     } else {
         showMessage('INCORRECT. Answer rejected.', 'error');
+        // Subtract points for incorrect answer
+        dashboardState.points -= 5;
+        updatePointsDisplay();
     }
 }
 
@@ -373,31 +520,114 @@ function closeAnswerModal() {
 }
 
 /**
- * Handle trash all dares
+ * Show complete dare modal
  */
-function handleTrashAllDares() {
-    if (dashboardState.points < 10) {
-        showMessage('Insufficient points. Need 10 points to trash all dares.', 'error');
-        return;
-    }
+function showCompleteModal(index) {
+    dashboardState.pendingDareIndex = index;
+    const modal = document.getElementById('completeDareModal');
+    modal.style.display = 'flex';
+}
+
+/**
+ * Close complete dare modal
+ */
+function closeCompleteModal() {
+    const modal = document.getElementById('completeDareModal');
+    modal.style.display = 'none';
+    dashboardState.pendingDareIndex = null;
+}
+
+/**
+ * Show trash dare modal
+ */
+function showTrashModal(index) {
+    dashboardState.pendingDareIndex = index;
+    const modal = document.getElementById('trashDareModal');
+    modal.style.display = 'flex';
+}
+
+/**
+ * Close trash dare modal
+ */
+function closeTrashModal() {
+    const modal = document.getElementById('trashDareModal');
+    modal.style.display = 'none';
+    dashboardState.pendingDareIndex = null;
+}
+
+/**
+ * Handle confirm complete dare
+ */
+function handleConfirmComplete() {
+    const index = dashboardState.pendingDareIndex;
+    if (index === null || index === undefined) return;
     
-    // Confirm action
-    if (!confirm('Trash all dares? This will cost 10 points.')) {
-        return;
-    }
+    closeCompleteModal();
     
-    // Subtract points
-    dashboardState.points -= 10;
+    // Award points
+    dashboardState.points += 10;
     updatePointsDisplay();
     
-    // Replace with new random dares
-    dashboardState.activeDares = getRandomDares(5);
-    dashboardState.selectedDare = null;
+    // Remove dare
+    dashboardState.activeDares.splice(index, 1);
+    
+    // Clear selection if this was selected
+    if (dashboardState.selectedDare && dashboardState.selectedDare.index === index) {
+        dashboardState.selectedDare = null;
+    }
     
     // Re-render dares
     renderActiveDares();
     
-    showMessage('All dares trashed. New dares loaded.', 'info');
+    showMessage(`Dare completed! +10 points`, 'success');
+}
+
+/**
+ * Handle confirm trash dare
+ */
+function handleConfirmTrash() {
+    const index = dashboardState.pendingDareIndex;
+    if (index === null || index === undefined) return;
+    
+    closeTrashModal();
+    
+    // Deduct points for trashing
+    dashboardState.points -= 5;
+    updatePointsDisplay();
+    
+    // Remove dare
+    dashboardState.activeDares.splice(index, 1);
+    
+    // Clear selection if this was selected
+    if (dashboardState.selectedDare && dashboardState.selectedDare.index === index) {
+        dashboardState.selectedDare = null;
+    }
+    
+    // Replace with a new random dare from the available dares list
+    if (dashboardState.allDares.length > 0) {
+        // Get dares that aren't already in activeDares
+        // Compare by id (Firestore document ID or data id field)
+        const usedIds = new Set(dashboardState.activeDares.map(d => d.id || d.challenge));
+        const availableDares = dashboardState.allDares.filter(d => {
+            const dareId = d.id || d.challenge;
+            return !usedIds.has(dareId);
+        });
+        
+        if (availableDares.length > 0) {
+            // Pick a random dare from available ones
+            const randomIndex = Math.floor(Math.random() * availableDares.length);
+            dashboardState.activeDares.push(availableDares[randomIndex]);
+        } else {
+            // If all dares are used, pick a random one from all dares
+            const randomIndex = Math.floor(Math.random() * dashboardState.allDares.length);
+            dashboardState.activeDares.push(dashboardState.allDares[randomIndex]);
+        }
+    }
+    
+    // Re-render dares
+    renderActiveDares();
+    
+    showMessage('Dare trashed. -5 points', 'info');
 }
 
 /**
@@ -410,54 +640,17 @@ function handleDareAction(e) {
     const action = button.dataset.action;
     const index = parseInt(button.dataset.index, 10);
     
-    if (action === 'select') {
-        // Deselect previous
-        document.querySelectorAll('.dare-item').forEach(item => {
-            item.classList.remove('selected');
-        });
-        
-        // Select new
-        const dareElement = button.closest('.dare-item');
-        dareElement.classList.add('selected');
-        
-        dashboardState.selectedDare = {
-            index: index,
-            dare: dashboardState.activeDares[index]
-        };
-        
-        showMessage(`Dare #${index + 1} selected`, 'info');
-    } else if (action === 'request-hint') {
-        const dareElement = button.closest('.dare-item');
-        const hintElement = dareElement.querySelector('.dare-hint');
-        
-        if (hintElement) {
-            hintElement.style.display = 'block';
-            showMessage('Hint revealed', 'info');
-        } else {
-            showMessage('No hint available for this dare', 'error');
-        }
-    } else if (action === 'complete') {
+    if (action === 'complete') {
         if (!dashboardState.unlocked) {
             showMessage('Controls are locked', 'error');
             return;
         }
         
-        // Award points
-        dashboardState.points += 10;
-        updatePointsDisplay();
-        
-        // Remove dare
-        dashboardState.activeDares.splice(index, 1);
-        
-        // Clear selection if this was selected
-        if (dashboardState.selectedDare && dashboardState.selectedDare.index === index) {
-            dashboardState.selectedDare = null;
-        }
-        
-        // Re-render dares
-        renderActiveDares();
-        
-        showMessage(`Dare completed! +10 points`, 'success');
+        // Show completion confirmation modal
+        showCompleteModal(index);
+    } else if (action === 'trash') {
+        // Show trash confirmation modal
+        showTrashModal(index);
     }
 }
 

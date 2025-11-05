@@ -5,6 +5,73 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Operation Water Rock - Admin Panel</title>
     <link rel="stylesheet" href="css/style.css">
+    <style>
+        /* Admin panel styles */
+        body {
+            overflow-y: auto;
+        }
+        
+        .terminal-container {
+            min-height: 100vh;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+        }
+        
+        .terminal-header {
+            margin-bottom: 20px;
+            text-align: center;
+        }
+        
+        .terminal-window {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            background: rgba(0, 0, 0, 0.8);
+            border: 1px solid #00ff00;
+            padding: 20px;
+            min-height: 0;
+        }
+        
+        .terminal-output {
+            flex: 1;
+            overflow-y: auto;
+            overflow-x: hidden;
+            margin-bottom: 20px;
+            padding: 10px;
+            font-family: 'Courier New', monospace;
+            color: #00ff00;
+            text-shadow: 0 0 5px #00ff00;
+        }
+        
+        .terminal-input-container {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            border-top: 1px solid #00ff00;
+            padding-top: 10px;
+        }
+        
+        .terminal-input {
+            flex: 1;
+            background: transparent;
+            border: none;
+            color: #00ff00;
+            font-family: 'Courier New', monospace;
+            font-size: 1rem;
+            outline: none;
+            text-shadow: 0 0 5px #00ff00;
+        }
+        
+        .admin-nav {
+            margin-top: 20px;
+            padding-top: 20px;
+            border-top: 1px solid #00ff00;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+    </style>
 </head>
 <body>
     <!-- 

@@ -12,6 +12,7 @@
 import { 
     updateAdminState, 
     addDare,
+    addRiddle,
     saveUser
 } from './firebase-service.js';
 
@@ -78,7 +79,7 @@ export async function importDaresFromJSON() {
         
         for (const dare of dares) {
             await addDare(dare);
-            console.log(`Imported: ${dare.title}`);
+            console.log(`Imported: ${dare.challenge || dare.id}`);
         }
         
         console.log('All dares imported successfully');
@@ -88,13 +89,36 @@ export async function importDaresFromJSON() {
 }
 
 /**
- * Run complete setup (admin state + users + dares import)
+ * Import riddles from JSON to Firestore
+ */
+export async function importRiddlesFromJSON() {
+    try {
+        const response = await fetch('data/riddles.json');
+        const data = await response.json();
+        const riddles = data.riddles || [];
+        
+        console.log(`Importing ${riddles.length} riddles...`);
+        
+        for (const riddle of riddles) {
+            await addRiddle(riddle);
+            console.log(`Imported riddle ${riddle.id}: ${riddle.riddle}`);
+        }
+        
+        console.log('All riddles imported successfully');
+    } catch (error) {
+        console.error('Error importing riddles:', error);
+    }
+}
+
+/**
+ * Run complete setup (admin state + users + dares + riddles import)
  */
 export async function setupFirebase() {
     console.log('Starting Firebase setup...');
     await initAdminState();
     await initUsers();
     await importDaresFromJSON();
+    await importRiddlesFromJSON();
     console.log('Firebase setup complete!');
     console.log('⚠️ IMPORTANT: Change passwords using admin panel!');
 }

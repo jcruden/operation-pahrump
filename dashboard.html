@@ -36,57 +36,42 @@
             
             <!-- Main dashboard content -->
             <main class="dashboard-main">
-                <!-- Control panel -->
-                <section class="control-panel">
-                    <h2 class="panel-title">CONTROL PANEL</h2>
-                    <div class="control-buttons">
-                        <button 
-                            id="completeDareBtn" 
-                            class="control-btn locked"
-                            disabled
-                            aria-label="Complete Dare"
-                        >
-                            <span class="btn-icon">✓</span>
-                            <span class="btn-label">COMPLETE DARE</span>
-                            <span class="btn-status">LOCKED</span>
-                        </button>
-                        
-                        <button 
-                            id="nextHintBtn" 
-                            class="control-btn locked"
-                            disabled
-                            aria-label="Next Hint"
-                        >
-                            <span class="btn-icon">?</span>
-                            <span class="btn-label">NEXT HINT</span>
-                            <span class="btn-status">LOCKED</span>
-                        </button>
-                        
-                        <button 
-                            id="enterAnswerBtn" 
-                            class="control-btn locked"
-                            disabled
-                            aria-label="Enter Answer"
-                        >
-                            <span class="btn-icon">→</span>
-                            <span class="btn-label">ENTER ANSWER</span>
-                            <span class="btn-status">LOCKED</span>
-                        </button>
-                    </div>
-                </section>
+                <!-- Left column -->
+                <div class="dashboard-left">
+                    <!-- Clue panel -->
+                    <section class="riddle-panel">
+                        <h2 class="panel-title">CLUE</h2>
+                        <div class="riddle-box" id="riddleBox">
+                            <div class="riddle-content" id="riddleContent">COME BACK LATER</div>
+                            <div class="riddle-hint" id="riddleHint" style="display: none;"></div>
+                        </div>
+                        <div class="riddle-actions">
+                            <button 
+                                id="hintBtn" 
+                                class="riddle-btn locked"
+                                disabled
+                                aria-label="Get Hint"
+                            >
+                                <span class="btn-icon">?</span>
+                                <span class="btn-label">HINT</span>
+                            </button>
+                            <button 
+                                id="enterAnswerBtn" 
+                                class="riddle-btn locked"
+                                disabled
+                                aria-label="Enter Answer"
+                            >
+                                <span class="btn-icon">→</span>
+                                <span class="btn-label">ENTER ANSWER</span>
+                            </button>
+                        </div>
+                    </section>
+                </div>
                 
-                <!-- Dares panel -->
+                <!-- Right column - Dares panel -->
                 <section class="dares-panel">
                     <div class="dares-header">
                         <h2 class="panel-title">ACTIVE DARES</h2>
-                        <button 
-                            id="trashAllBtn" 
-                            class="trash-btn"
-                            aria-label="Trash All Dares"
-                        >
-                            <span class="btn-icon">🗑</span>
-                            <span class="btn-label">TRASH ALL</span>
-                        </button>
                     </div>
                     <div class="dares-list" id="daresList">
                         <!-- Dares will be dynamically inserted here -->
@@ -107,6 +92,42 @@
                         <div class="modal-buttons">
                             <button id="submitAnswerBtn" class="modal-btn submit">SUBMIT</button>
                             <button id="cancelAnswerBtn" class="modal-btn cancel">CANCEL</button>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Complete dare confirmation modal -->
+                <div class="modal-overlay" id="completeDareModal" style="display: none;">
+                    <div class="modal-content">
+                        <h3 class="modal-title">COMPLETE DARE</h3>
+                        <p class="modal-message">Photo evidence needed later. By honor code: confirm</p>
+                        <div class="modal-buttons">
+                            <button id="confirmCompleteBtn" class="modal-btn submit">CONFIRM</button>
+                            <button id="cancelCompleteBtn" class="modal-btn cancel">CANCEL</button>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Trash dare confirmation modal -->
+                <div class="modal-overlay" id="trashDareModal" style="display: none;">
+                    <div class="modal-content">
+                        <h3 class="modal-title">TRASH DARE</h3>
+                        <p class="modal-message">This will cost -5 points.</p>
+                        <div class="modal-buttons">
+                            <button id="confirmTrashBtn" class="modal-btn submit">CONFIRM</button>
+                            <button id="cancelTrashBtn" class="modal-btn cancel">CANCEL</button>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Hint confirmation modal -->
+                <div class="modal-overlay" id="hintModal" style="display: none;">
+                    <div class="modal-content">
+                        <h3 class="modal-title">GET HINT</h3>
+                        <p class="modal-message">This will cost -30 points.</p>
+                        <div class="modal-buttons">
+                            <button id="confirmHintBtn" class="modal-btn submit">CONFIRM</button>
+                            <button id="cancelHintBtn" class="modal-btn cancel">CANCEL</button>
                         </div>
                     </div>
                 </div>

@@ -15,7 +15,11 @@ import {
     updateAdminState,
     subscribeToAdminState,
     subscribeToDares,
-    validatePassword
+    validatePassword,
+    getAllRiddles,
+    addRiddle,
+    updateRiddle,
+    deleteRiddle
 } from './firebase-service.js';
 
 // Admin state
@@ -277,6 +281,8 @@ async function processCommand(command) {
                     await displayUsersList();
                 } else if (args[0] === 'points') {
                     await displayPointsList();
+                } else if (args[0] === 'riddles') {
+                    await displayRiddlesList();
                 } else {
                     displayDaresList();
                 }
@@ -286,6 +292,9 @@ async function processCommand(command) {
                 break;
             case 'add':
                 await handleAddDare(args);
+                break;
+            case 'riddle':
+                await handleRiddleCommand(args);
                 break;
             case 'edit':
                 await handleEditDare(args);
@@ -325,10 +334,14 @@ Available commands:
   list              - List all dares
   list users        - List all users
   list points       - List all player points
+  list riddles      - List all riddles
   points            - List all player points (shortcut)
-  add               - Add a new dare
-  edit <id>         - Edit a dare by ID
+  add "challenge"   - Add a new dare (simple one-line challenge)
+  edit <id> challenge "<value>" - Edit dare challenge
   delete <id>       - Delete a dare by ID
+  riddle add <id> "riddle" "answer" "hint" - Add a new riddle
+  riddle edit <id> <field> "<value>" - Edit riddle (field: riddle, answer, or hint)
+  riddle delete <id> - Delete a riddle by ID
   user add <role>   - Add a new user
   user list         - List all users
   user pass <id>    - Change user password
@@ -354,7 +367,8 @@ function displayDaresList() {
     addOutputLine(`\nTotal dares: ${adminState.dares.length}\n`, 'info');
     
     adminState.dares.forEach((dare, index) => {
-        const line = `[${dare.id || index + 1}] ${dare.title || 'Untitled'} - ${dare.difficulty || 'unknown'} (${dare.category || 'general'})`;
+        const challenge = dare.challenge || dare.title || dare.description || 'Untitled';
+        const line = `[${dare.id || index + 1}] ${challenge}`;
         addOutputLine(line, 'dare');
     });
 }
@@ -417,24 +431,125 @@ function displaySettings() {
 }
 
 /**
- * Handle add dare command
+ * Display riddles list
  */
-async function handleAddDare(args) {
-    // For now, use a simple format: add "title" "description" "difficulty" "category" "riddle" "answer" "hint"
-    if (args.length < 7) {
-        addOutputLine('Usage: add "title" "description" "difficulty" "category" "riddle" "answer" "hint"', 'error');
-        addOutputLine('Example: add "Test Dare" "Test description" "easy" "riddle" "What is it?" "test" "Test hint"', 'info');
+async function displayRiddlesList() {
+    adminState.currentView = 'riddles';
+    try {
+        const riddles = await getAllRiddles();
+        const sortedRiddles = [...riddles].sort((a, b) => (a.id || 0) - (b.id || 0));
+        
+        if (sortedRiddles.length === 0) {
+            addOutputLine('No riddles found. Use "riddle add" to create a new riddle.', 'info');
+            return;
+        }
+        
+        addOutputLine(`\nTotal riddles: ${sortedRiddles.length}\n`, 'info');
+        
+        sortedRiddles.forEach((riddle) => {
+            const line = `[${riddle.id}] ${riddle.riddle || 'No riddle text'} -> ${riddle.answer || 'No answer'}`;
+            addOutputLine(line, 'riddle');
+        });
+    } catch (error) {
+        addOutputLine(`Error loading riddles: ${error.message}`, 'error');
+    }
+}
+
+/**
+ * Handle riddle command
+ */
+async function handleRiddleCommand(args) {
+    if (args.length < 1) {
+        addOutputLine('Usage: riddle <command> [args]', 'error');
+        addOutputLine('Commands: add <id> "riddle" "answer" "hint", edit <id> <field> "<value>", delete <id>', 'info');
         return;
     }
     
+    const subCmd = args[0].toLowerCase();
+    
+    if (subCmd === 'add') {
+        if (args.length < 5) {
+            addOutputLine('Usage: riddle add <id> "riddle" "answer" "hint"', 'error');
+            addOutputLine('Example: riddle add 1 "What has keys?" "piano" "It\'s a musical instrument"', 'info');
+            return;
+        }
+        const id = parseInt(args[1], 10);
+        const riddle = args[2].replace(/"/g, '');
+        const answer = args[3].replace(/"/g, '');
+        const hint = args[4].replace(/"/g, '');
+        
+        try {
+            await addRiddle({
+                id: id,
+                riddle: riddle,
+                answer: answer,
+                hint: hint
+            });
+            addOutputLine(`Riddle ${id} added successfully.`, 'success');
+            await displayRiddlesList();
+        } catch (error) {
+            addOutputLine(`Error adding riddle: ${error.message}`, 'error');
+        }
+    } else if (subCmd === 'edit') {
+        if (args.length < 4) {
+            addOutputLine('Usage: riddle edit <id> <field> "<value>"', 'error');
+            addOutputLine('Fields: riddle, answer, hint', 'info');
+            return;
+        }
+        const riddleId = args[1];
+        const field = args[2];
+        const value = args.slice(3).join(' ').replace(/"/g, '');
+        
+        if (!['riddle', 'answer', 'hint'].includes(field)) {
+            addOutputLine('Field must be: riddle, answer, or hint', 'error');
+            return;
+        }
+        
+        try {
+            await updateRiddle(riddleId, { [field]: value });
+            addOutputLine(`Riddle ${riddleId} updated successfully.`, 'success');
+            await displayRiddlesList();
+        } catch (error) {
+            addOutputLine(`Error updating riddle: ${error.message}`, 'error');
+        }
+    } else if (subCmd === 'delete') {
+        if (args.length < 2) {
+            addOutputLine('Usage: riddle delete <id>', 'error');
+            return;
+        }
+        const riddleId = args[1];
+        
+        if (!confirm(`Are you sure you want to delete riddle ${riddleId}?`)) {
+            return;
+        }
+        
+        try {
+            await deleteRiddle(riddleId);
+            addOutputLine(`Riddle ${riddleId} deleted successfully.`, 'success');
+            await displayRiddlesList();
+        } catch (error) {
+            addOutputLine(`Error deleting riddle: ${error.message}`, 'error');
+        }
+    } else {
+        addOutputLine('Unknown riddle command. Use: add, edit, or delete', 'error');
+    }
+}
+
+/**
+ * Handle add dare command
+ */
+async function handleAddDare(args) {
+    // Simple format: add "challenge text"
+    if (args.length < 1) {
+        addOutputLine('Usage: add "challenge text"', 'error');
+        addOutputLine('Example: add "Take a picture in a fountain"', 'info');
+        return;
+    }
+    
+    const challenge = args.join(' ').replace(/"/g, '');
+    
     const dareData = {
-        title: args[0].replace(/"/g, ''),
-        description: args[1].replace(/"/g, ''),
-        difficulty: args[2].replace(/"/g, ''),
-        category: args[3].replace(/"/g, ''),
-        riddle: args[4].replace(/"/g, ''),
-        answer: args[5].replace(/"/g, ''),
-        hint: args[6].replace(/"/g, ''),
+        challenge: challenge,
         id: adminState.dares.length + 1
     };
     

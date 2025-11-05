@@ -94,6 +94,115 @@ export async function validatePassword(password) {
 }
 
 /**
+ * Get all riddles from Firestore
+ */
+export async function getAllRiddles() {
+    if (!db) {
+        throw new Error("Firebase not configured");
+    }
+    
+    try {
+        const riddlesRef = collection(db, "riddles");
+        const q = query(riddlesRef, orderBy("id", "asc"));
+        const snapshot = await getDocs(q);
+        
+        return snapshot.docs.map(doc => ({
+            id: doc.id,
+            ...doc.data()
+        }));
+    } catch (error) {
+        console.error("Error loading riddles:", error);
+        throw error;
+    }
+}
+
+/**
+ * Subscribe to riddles changes (real-time)
+ */
+export function subscribeToRiddles(callback) {
+    if (!db) {
+        console.warn("Firebase not configured - subscribeToRiddles not available");
+        callback([]);
+        return () => {}; // Return no-op unsubscribe function
+    }
+    
+    const riddlesRef = collection(db, "riddles");
+    const q = query(riddlesRef, orderBy("id", "asc"));
+    
+    return onSnapshot(q, (snapshot) => {
+        const riddles = snapshot.docs.map(doc => ({
+            id: doc.id,
+            ...doc.data()
+        }));
+        callback(riddles);
+    }, (error) => {
+        console.error("Error subscribing to riddles:", error);
+        callback([]);
+    });
+}
+
+/**
+ * Add a new riddle to Firestore
+ */
+export async function addRiddle(riddleData) {
+    if (!db) {
+        throw new Error("Firebase not configured");
+    }
+    
+    try {
+        const riddlesRef = collection(db, "riddles");
+        const docRef = await addDoc(riddlesRef, {
+            ...riddleData,
+            createdAt: serverTimestamp(),
+            updatedAt: serverTimestamp()
+        });
+        return docRef.id;
+    } catch (error) {
+        console.error("Error adding riddle:", error);
+        throw error;
+    }
+}
+
+/**
+ * Update a riddle in Firestore
+ */
+export async function updateRiddle(riddleId, updates) {
+    if (!db) {
+        throw new Error("Firebase not configured");
+    }
+    
+    try {
+        const riddleRef = doc(db, "riddles", riddleId);
+        await updateDoc(riddleRef, {
+            ...updates,
+            updatedAt: serverTimestamp()
+        });
+        return true;
+    } catch (error) {
+        console.error("Error updating riddle:", error);
+        throw error;
+    }
+}
+
+/**
+ * Delete a riddle from Firestore
+ */
+export async function deleteRiddle(riddleId) {
+    if (!db) {
+        throw new Error("Firebase not configured");
+    }
+    
+    try {
+        const riddleRef = doc(db, "riddles", riddleId);
+        await deleteDoc(riddleRef);
+        return true;
+    } catch (error) {
+        console.error("Error deleting riddle:", error);
+        throw error;
+    }
+}
+
+/**
  * Get all dares from Firestore
  */
 export async function getAllDares() {

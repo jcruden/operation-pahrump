@@ -1,5 +1,5 @@
 /**
- * Instructions page JavaScript for operation-water-rock.
+ * Instructions page JavaScript for operation pahrump.
  * Handles typewriter effect for instructions and drink selection.
  */
 

@@ -15,23 +15,23 @@ admin/state
 
 ### 2. `users/{userId}` (Collection)
 ```
-users/player1
-  - role: string ("player1")
-  - username: string ("player1")
+users/Dani
+  - role: string ("Dani")
+  - username: string ("Dani")
   - password: string (plaintext password)
   - active: boolean (true)
   - updatedAt: timestamp
 
-users/player2
-  - role: string ("player2")
-  - username: string ("player2")
+users/JT
+  - role: string ("JT")
+  - username: string ("JT")
   - password: string (plaintext password)
   - active: boolean (true)
   - updatedAt: timestamp
 
-users/player3
-  - role: string ("player3")
-  - username: string ("player3")
+users/Alana
+  - role: string ("Alana")
+  - username: string ("Alana")
   - password: string (plaintext password)
   - active: boolean (true)
   - updatedAt: timestamp
@@ -150,7 +150,7 @@ riddles/jkl012
 ### Option 2: Using Firebase Console (Manual)
 
 1. Go to [Firebase Console](https://console.firebase.google.com/)
-2. Select your project: `operation-water-rock`
+2. Select your project: `operation-pahrump`
 3. Go to **Firestore Database**
 4. Click **Start collection** or use existing collections
 
@@ -164,9 +164,9 @@ riddles/jkl012
 #### Create Users:
 - Collection ID: `users`
 - For each user, create a document:
-  - Document ID: `player1`, `player2`, `player3`, `admin`
+  - Document ID: `Dani`, `JT`, `Alana`, `admin`
   - Fields:
-    - `role` (string): `player1`, `player2`, `player3`, or `admin`
+    - `role` (string): `Dani`, `JT`, `Alana`, or `admin`
     - `username` (string): same as role
     - `password` (string): your chosen password
     - `active` (boolean): `true`
@@ -217,14 +217,14 @@ Firestore Database
 │       └── updatedAt: timestamp
 │
 ├── users (collection)
-│   ├── player1 (document)
-│   │   ├── role: "player1"
-│   │   ├── username: "player1"
+│   ├── Dani (document)
+│   │   ├── role: "Dani"
+│   │   ├── username: "Dani"
 │   │   ├── password: "your_password"
 │   │   ├── active: true
 │   │   └── updatedAt: timestamp
-│   ├── player2 (document)
-│   ├── player3 (document)
+│   ├── JT (document)
+│   ├── Alana (document)
 │   └── admin (document)
 │
 ├── dares (collection)
@@ -251,7 +251,7 @@ Firestore Database
 ## Important Notes
 
 1. **Document IDs**: 
-   - For `users`: Use role names as document IDs (`player1`, `player2`, `player3`, `admin`)
+   - For `users`: Use role names as document IDs (`Dani`, `JT`, `Alana`, `admin`)
    - For `dares` and `riddles`: Use auto-generated IDs (Firebase will create them)
 
 2. **Ordering**: 
@@ -269,7 +269,7 @@ Firestore Database
 
 5. **Points**: 
    - Points are stored in `localStorage`, NOT in Firestore
-   - Each user's points are stored as: `points_player1`, `points_player2`, etc.
+   - Each user's points are stored as: `points_Dani`, `points_JT`, `points_Alana`, etc.
 
 ## Quick Setup Checklist
 

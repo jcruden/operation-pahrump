@@ -1,5 +1,5 @@
 /**
- * Admin panel JavaScript for operation-water-rock.
+ * Admin panel JavaScript for operation pahrump.
  * Handles administrative functions for managing dares data, users, and admin state.
  */
 
@@ -361,7 +361,7 @@ Available commands:
   user pass <id>    - Change user password\n
   unlock <true|false> - Set unlocked state\n
   proceed <true|false> - Allow users to proceed from instructions to dashboard\n
-  reset vote <userId>  - Reset drink vote for a user (e.g., reset vote player1)\n
+  reset vote <userId>  - Reset drink vote for a user (e.g., reset vote Dani)\n
   settings          - Show admin settings\n
   clear             - Clear output    
 `;
@@ -769,7 +769,7 @@ async function handleProceed(args) {
 async function handleResetVote(args) {
     if (args.length < 2 || args[0].toLowerCase() !== 'vote') {
         addOutputLine('Usage: reset vote <userId>', 'error');
-        addOutputLine('Example: reset vote player1', 'info');
+        addOutputLine('Example: reset vote Dani', 'info');
         return;
     }
     

@@ -31,19 +31,19 @@ export async function initAdminState() {
 export async function initUsers() {
     const users = [
         { 
-            role: 'player1', 
-            password: prompt('Enter password for player1 (or press Cancel for default):') || 'change_me_player1',
-            username: 'player1'
+            role: 'Dani', 
+            password: prompt('Enter password for Dani (or press Cancel for default):') || 'change_me_Dani',
+            username: 'Dani'
         },
         { 
-            role: 'player2', 
-            password: prompt('Enter password for player2 (or press Cancel for default):') || 'change_me_player2',
-            username: 'player2'
+            role: 'JT', 
+            password: prompt('Enter password for JT (or press Cancel for default):') || 'change_me_JT',
+            username: 'JT'
         },
         { 
-            role: 'player3', 
-            password: prompt('Enter password for player3 (or press Cancel for default):') || 'change_me_player3',
-            username: 'player3'
+            role: 'Alana', 
+            password: prompt('Enter password for Alana (or press Cancel for default):') || 'change_me_Alana',
+            username: 'Alana'
         },
         { 
             role: 'admin', 

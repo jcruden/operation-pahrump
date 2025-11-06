@@ -1,5 +1,5 @@
 /**
- * Firebase service module for operation-water-rock.
+ * Firebase service module for operation pahrump.
  * Handles Firestore operations for dares management only.
  * Authentication and points use localStorage.
  */

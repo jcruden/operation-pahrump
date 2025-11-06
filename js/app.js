@@ -1,5 +1,5 @@
 /**
- * Main application JavaScript for operation-water-rock.
+ * Main application JavaScript for operation pahrump.
  * Handles terminal interface with typewriter effect and password prompt.
  */
 
@@ -26,7 +26,7 @@ document.addEventListener('DOMContentLoaded', function() {
         }
         
         // The text to type out
-        const introText = 'operation water rock';
+        const introText = 'operation pahrump';
     
     // Typewriter effect function
     function typeWriter(text, element, speed = 100, callback) {
@@ -56,7 +56,7 @@ document.addEventListener('DOMContentLoaded', function() {
         typewriterContainer.style.display = 'none';
         passwordPromptContainer.style.display = 'block';
         
-        // Show "operation water rock" header at top
+        // Show "operation pahrump" header at top
         const passwordHeader = document.getElementById('passwordHeader');
         if (passwordHeader) passwordHeader.style.display = 'block';
         

@@ -1,5 +1,5 @@
 /**
- * Dashboard JavaScript for operation-water-rock.
+ * Dashboard JavaScript for operation pahrump.
  * Handles dashboard UI, points management, and dare interactions.
  */
 
@@ -670,6 +670,11 @@ function handleDareAction(e) {
         // Show completion confirmation modal
         showCompleteModal(index);
     } else if (action === 'trash') {
+        if (!dashboardState.unlocked) {
+            showMessage('Controls are locked', 'error');
+            return;
+        }
+        
         // Show trash confirmation modal
         showTrashModal(index);
     }

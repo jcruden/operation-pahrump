@@ -1,11 +1,11 @@
-# Operation Water Rock
+# Operation Pahrump
 
 A terminal-style static website project built with plain HTML, CSS, and JavaScript. A hacker-themed game dashboard with role-based access, points system, and interactive dares.
 
 ## Project Structure
 
 ```
-operation-water-rock/
+operation-pahrump/
 ├── index.html          # Login page with password authentication
 ├── dashboard.html      # Main dashboard with points and dares
 ├── admin.html          # Admin panel (password protected)
@@ -27,7 +27,7 @@ operation-water-rock/
 
 ## Features
 
-- **Role-based authentication** - Four roles: player1, player2, player3, admin
+- **Role-based authentication** - Four roles: Dani, JT, Alana, admin
 - **Terminal-style UI** - CRT aesthetic with green text, scanlines, and flicker effects
 - **Interactive typewriter effect** - Animated text with moving cursor
 - **Points system** - Earn points through dare completion (+10 points) and riddle answers (+50 correct, -5 incorrect). Points can be negative.
@@ -43,7 +43,7 @@ operation-water-rock/
 1. Clone the repository:
    ```bash
    git clone <repository-url>
-   cd operation-water-rock
+   cd operation-pahrump
    ```
 
 2. Open `index.html` in a web browser or use a local server:
@@ -82,7 +82,7 @@ operation-water-rock/
 1. Push code to GitHub repository
 2. Go to Settings → Pages
 3. Select main branch and root folder
-4. Site will be available at `https://<username>.github.io/operation-water-rock/`
+4. Site will be available at `https://<username>.github.io/operation-pahrump/`
 
 ## Browser Support
 
@@ -159,7 +159,7 @@ Edit `data/dares.json` to add your own dares:
 
 ```json
 {
-  "description": "Simple dares/challenges for operation-water-rock",
+  "description": "Simple dares/challenges for operation pahrump",
   "version": "1.0",
   "dares": [
     {
@@ -184,7 +184,7 @@ Edit `data/riddles.json` to add your own riddles:
 
 ```json
 {
-  "description": "Riddles data for operation-water-rock",
+  "description": "Riddles data for operation pahrump",
   "version": "1.0",
   "riddles": [
     {
@@ -265,7 +265,7 @@ service cloud.firestore {
 
 - **Authentication**: Firestore `users` collection (passwords not in codebase)
 - **User Management**: Firestore `users` collection (admin manages via admin panel)
-- **Points**: localStorage (per user: `points_player1`, `points_player2`, etc.) - can be negative
+- **Points**: localStorage (per user: `points_Dani`, `points_JT`, `points_Alana`, etc.) - can be negative
 - **Dares**: Firestore `dares` collection (for admin management and real-time updates)
 - **Riddles**: Firestore `riddles` collection (shown sequentially, real-time updates)
 - **Admin State**: Firestore (unlocked flag for real-time sync)

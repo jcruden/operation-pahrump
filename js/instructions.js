@@ -54,7 +54,7 @@ document.addEventListener('DOMContentLoaded', async function() {
             const waitingMessage = document.createElement('div');
             waitingMessage.className = 'waiting-message';
             waitingMessage.style.cssText = 'margin-top: 20px; font-size: clamp(0.9rem, 2vw, 1.1rem); color: #00ff00; text-shadow: 0 0 5px #00ff00, 0 0 10px #00ff00; text-align: center;';
-            waitingMessage.textContent = 'Vote submitted. Waiting for admin to proceed...';
+            waitingMessage.textContent = 'Vote submitted.';
             drinkSelectionContainer.appendChild(waitingMessage);
         } else {
             // Start typewriter effect for new users

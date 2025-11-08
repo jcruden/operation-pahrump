@@ -21,7 +21,13 @@ import {
     updateRiddle,
     deleteRiddle,
     getAllDrinkChoices,
-    deleteDrinkChoice
+    deleteDrinkChoice,
+    getAllClues,
+    addClue,
+    updateClue,
+    deleteClue,
+    getAllUsersClueProgress,
+    updateUserClueProgress
 } from './firebase-service.js';
 
 // Admin state
@@ -285,6 +291,10 @@ async function processCommand(command) {
                     await displayPointsList();
                 } else if (args[0] === 'riddles') {
                     await displayRiddlesList();
+                } else if (args[0] === 'clues') {
+                    await displayCluesList();
+                } else if (args[0] === 'progress') {
+                    await displayClueProgress();
                 } else {
                     displayDaresList();
                 }
@@ -301,6 +311,9 @@ async function processCommand(command) {
                 break;
             case 'riddle':
                 await handleRiddleCommand(args);
+                break;
+            case 'clue':
+                await handleClueCommand(args);
                 break;
             case 'edit':
                 await handleEditDare(args);
@@ -348,6 +361,8 @@ Available commands:
   list users        - List all users\n
   list points       - List all player points\n
   list riddles      - List all riddles\n
+  list clues        - List all clues\n
+  list progress     - List all user clue progress\n
   points            - List all player points (shortcut)\n
   drinks            - List all drink choices\n
   add "challenge"   - Add a new dare (simple one-line challenge)\n
@@ -355,7 +370,11 @@ Available commands:
   delete <id>       - Delete a dare by ID\n
   riddle add <id> "riddle" "answer" "hint" - Add a new riddle\n
   riddle edit <id> <field> "<value>" - Edit riddle (field: riddle, answer, or hint)\n
-  riddle delete <id> - Delete a riddle by ID\n  
+  riddle delete <id> - Delete a riddle by ID\n
+  clue add <order> <type> "riddle" "answer" "hint" [assignedTo] - Add a clue\n
+  clue edit <id> <field> "<value>" - Edit clue\n
+  clue delete <id> - Delete a clue\n
+  clue reset <userId> - Reset user's clue progress\n  
   user add <role>   - Add a new user\n
   user list         - List all users\n
   user pass <id>    - Change user password\n
@@ -590,6 +609,200 @@ async function handleRiddleCommand(args) {
         }
     } else {
         addOutputLine('Unknown riddle command. Use: add, edit, or delete', 'error');
+    }
+}
+
+/**
+ * Handle clue command
+ */
+async function handleClueCommand(args) {
+    if (args.length < 1) {
+        addOutputLine('Usage: clue <command> [args]', 'error');
+        addOutputLine('Commands: add, edit, delete, reset', 'info');
+        addOutputLine('  clue add <order> global "riddle" "answer" "hint"', 'info');
+        addOutputLine('  clue add <order> person "riddle" "answer" "hint" Zoe,JT,Alana', 'info');
+        addOutputLine('  clue edit <id> <field> "<value>"', 'info');
+        addOutputLine('  clue delete <id>', 'info');
+        addOutputLine('  clue reset <userId>', 'info');
+        return;
+    }
+    
+    const subCmd = args[0].toLowerCase();
+    
+    if (subCmd === 'add') {
+        if (args.length < 6) {
+            addOutputLine('Usage: clue add <order> <type> "riddle" "answer" "hint" [assignedTo]', 'error');
+            addOutputLine('Types: global, person', 'info');
+            addOutputLine('Example: clue add 1 global "What has keys?" "piano" "musical instrument"', 'info');
+            addOutputLine('Example: clue add 2 person "Zoe\'s clue" "answer" "hint" Zoe', 'info');
+            return;
+        }
+        
+        const order = parseInt(args[1], 10);
+        const type = args[2].toLowerCase();
+        const riddle = args[3].replace(/"/g, '');
+        const answer = args[4].replace(/"/g, '');
+        const hint = args[5].replace(/"/g, '');
+        const assignedTo = args[6] ? args[6].split(',').map(s => s.trim()) : [];
+        
+        if (type !== 'global' && type !== 'person') {
+            addOutputLine('Type must be "global" or "person"', 'error');
+            return;
+        }
+        
+        const clueData = {
+            order: order,
+            type: type === 'person' ? 'person-specific' : 'global',
+            riddle: riddle,
+            answer: answer,
+            hint: hint
+        };
+        
+        if (type === 'person' && assignedTo.length > 0) {
+            clueData.assignedTo = assignedTo;
+        }
+        
+        try {
+            const id = await addClue(clueData);
+            addOutputLine(`Clue added successfully with ID: ${id}`, 'success');
+            await displayCluesList();
+        } catch (error) {
+            addOutputLine(`Error adding clue: ${error.message}`, 'error');
+        }
+    } else if (subCmd === 'edit') {
+        if (args.length < 4) {
+            addOutputLine('Usage: clue edit <id> <field> "<value>"', 'error');
+            addOutputLine('Fields: riddle, answer, hint, order, type, assignedTo', 'info');
+            addOutputLine('Example: clue edit abc123 riddle "New riddle text"', 'info');
+            return;
+        }
+        
+        const clueId = args[1];
+        const field = args[2];
+        const value = args.slice(3).join(' ').replace(/"/g, '');
+        
+        const updates = {};
+        
+        if (field === 'order') {
+            updates.order = parseInt(value, 10);
+        } else if (field === 'assignedTo') {
+            updates.assignedTo = value.split(',').map(s => s.trim());
+        } else {
+            updates[field] = value;
+        }
+        
+        try {
+            await updateClue(clueId, updates);
+            addOutputLine(`Clue ${clueId} updated successfully.`, 'success');
+            await displayCluesList();
+        } catch (error) {
+            addOutputLine(`Error updating clue: ${error.message}`, 'error');
+        }
+    } else if (subCmd === 'delete') {
+        if (args.length < 2) {
+            addOutputLine('Usage: clue delete <id>', 'error');
+            return;
+        }
+        
+        const clueId = args[1];
+        
+        if (!confirm(`Are you sure you want to delete clue ${clueId}?`)) {
+            return;
+        }
+        
+        try {
+            await deleteClue(clueId);
+            addOutputLine(`Clue ${clueId} deleted successfully.`, 'success');
+            await displayCluesList();
+        } catch (error) {
+            addOutputLine(`Error deleting clue: ${error.message}`, 'error');
+        }
+    } else if (subCmd === 'reset') {
+        if (args.length < 2) {
+            addOutputLine('Usage: clue reset <userId>', 'error');
+            addOutputLine('Example: clue reset Zoe', 'info');
+            return;
+        }
+        
+        const userId = args[1];
+        
+        try {
+            await updateUserClueProgress(userId, {
+                currentClueOrder: 0,
+                completedClueIds: [],
+                waitingForOthers: false
+            });
+            addOutputLine(`Clue progress reset for ${userId}`, 'success');
+            await displayClueProgress();
+        } catch (error) {
+            addOutputLine(`Error resetting clue progress: ${error.message}`, 'error');
+        }
+    } else {
+        addOutputLine('Unknown clue command. Use: add, edit, delete, or reset', 'error');
+    }
+}
+
+/**
+ * Display clues list
+ */
+async function displayCluesList() {
+    adminState.currentView = 'clues';
+    try {
+        const clues = await getAllClues();
+        const sortedClues = [...clues].sort((a, b) => (a.order || 0) - (b.order || 0));
+        
+        if (sortedClues.length === 0) {
+            addOutputLine('No clues found. Use "clue add" to create a new clue.', 'info');
+            return;
+        }
+        
+        addOutputLine(`\nTotal clues: ${sortedClues.length}\n`, 'info');
+        
+        sortedClues.forEach((clue) => {
+            const line = `[${clue.id}] Order ${clue.order}: ${clue.type}`;
+            addOutputLine(line, 'clue');
+            addOutputLine(`  Riddle: ${clue.riddle || 'No riddle text'}`, 'info');
+            addOutputLine(`  Answer: ${clue.answer || 'No answer'}`, 'info');
+            if (clue.hint) {
+                addOutputLine(`  Hint: ${clue.hint}`, 'info');
+            }
+            if (clue.type === 'person-specific' && clue.assignedTo && clue.assignedTo.length > 0) {
+                addOutputLine(`  Assigned to: ${clue.assignedTo.join(', ')}`, 'info');
+            }
+            addOutputLine('', 'info');
+        });
+    } catch (error) {
+        addOutputLine(`Error loading clues: ${error.message}`, 'error');
+    }
+}
+
+/**
+ * Display clue progress for all users
+ */
+async function displayClueProgress() {
+    adminState.currentView = 'progress';
+    try {
+        const progress = await getAllUsersClueProgress();
+        
+        if (progress.length === 0) {
+            addOutputLine('No user progress found.', 'info');
+            return;
+        }
+        
+        addOutputLine(`\nUser Clue Progress:\n`, 'info');
+        
+        progress.forEach((prog) => {
+            addOutputLine(`${prog.userId}:`, 'info');
+            addOutputLine(`  Current Order: ${prog.currentClueOrder || 0}`, 'info');
+            addOutputLine(`  Completed Clues: ${prog.completedClueIds?.length || 0}`, 'info');
+            addOutputLine(`  Waiting for Others: ${prog.waitingForOthers ? 'Yes' : 'No'}`, 'info');
+            if (prog.completedClueIds && prog.completedClueIds.length > 0) {
+                addOutputLine(`  Completed IDs: ${prog.completedClueIds.join(', ')}`, 'info');
+            }
+            addOutputLine('', 'info');
+        });
+    } catch (error) {
+        addOutputLine(`Error loading clue progress: ${error.message}`, 'error');
     }
 }
 

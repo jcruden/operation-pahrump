@@ -9,7 +9,15 @@ import {
     subscribeToDares, 
     subscribeToAdminState,
     getAllRiddles,
-    subscribeToRiddles
+    subscribeToRiddles,
+    getAllClues,
+    subscribeToClues,
+    getUserClueProgress,
+    subscribeToUserClueProgress,
+    markClueComplete,
+    subscribeToGlobalClueCompletion,
+    getGlobalClueCompletion,
+    updateUserClueProgress
 } from './firebase-service.js';
 
 // Dashboard state
@@ -25,7 +33,13 @@ let dashboardState = {
     currentRiddleIndex: 0,
     riddles: [],
     riddleHintShown: false,
-    pendingDareIndex: null  // Track which dare is pending confirmation
+    pendingDareIndex: null,  // Track which dare is pending confirmation
+    // Clue system state
+    clues: [],
+    currentClue: null,
+    clueProgress: null,
+    clueHintShown: false,
+    useClueSystem: false  // Flag to switch between old riddle system and new clue system
 };
 
 // Initialize dashboard when DOM is loaded
@@ -76,14 +90,31 @@ async function initializeDashboard() {
     // Load dares (from Firestore if available, else JSON)
     await loadDares();
     
-    // Load riddles
-    await loadRiddles();
+    // Try to load clues first (new system), fall back to riddles (old system)
+    try {
+        const clues = await getAllClues();
+        if (clues && clues.length > 0) {
+            dashboardState.useClueSystem = true;
+            dashboardState.clues = clues;
+            await loadClueProgress();
+        } else {
+            // No clues found, use old riddle system
+            await loadRiddles();
+        }
+    } catch (error) {
+        console.log('Clue system not available, using riddle system:', error);
+        await loadRiddles();
+    }
     
     // Render active dares
     renderActiveDares();
     
-    // Render riddle
-    renderRiddle();
+    // Render clue or riddle
+    if (dashboardState.useClueSystem) {
+        renderClue();
+    } else {
+        renderRiddle();
+    }
     
     // Set up event listeners
     setupEventListeners();
@@ -103,20 +134,36 @@ function setupRealtimeSubscriptions() {
         }
     });
     
-    // Subscribe to riddles changes
-    subscribeToRiddles((riddles) => {
-        const sortedRiddles = [...riddles].sort((a, b) => (a.id || 0) - (b.id || 0));
-        dashboardState.riddles = sortedRiddles;
-        // If current riddle index is out of bounds, reset it
-        if (dashboardState.currentRiddleIndex >= sortedRiddles.length) {
-            dashboardState.currentRiddleIndex = 0;
-        }
-        // Refresh current riddle if we don't have one
-        if (!dashboardState.currentRiddle && sortedRiddles.length > 0) {
-            dashboardState.currentRiddle = getNextRiddle();
-            renderRiddle();
-        }
-    });
+    // Subscribe to clues changes (new system)
+    if (dashboardState.useClueSystem) {
+        subscribeToClues((clues) => {
+            dashboardState.clues = clues.sort((a, b) => (a.order || 0) - (b.order || 0));
+            determineCurrentClue();
+            renderClue();
+        });
+        
+        // Subscribe to user's clue progress
+        subscribeToUserClueProgress(dashboardState.userId, (progress) => {
+            dashboardState.clueProgress = progress;
+            determineCurrentClue();
+            renderClue();
+        });
+    } else {
+        // Subscribe to riddles changes (old system)
+        subscribeToRiddles((riddles) => {
+            const sortedRiddles = [...riddles].sort((a, b) => (a.id || 0) - (b.id || 0));
+            dashboardState.riddles = sortedRiddles;
+            // If current riddle index is out of bounds, reset it
+            if (dashboardState.currentRiddleIndex >= sortedRiddles.length) {
+                dashboardState.currentRiddleIndex = 0;
+            }
+            // Refresh current riddle if we don't have one
+            if (!dashboardState.currentRiddle && sortedRiddles.length > 0) {
+                dashboardState.currentRiddle = getNextRiddle();
+                renderRiddle();
+            }
+        });
+    }
     
     // Subscribe to admin state changes
     subscribeToAdminState((state) => {
@@ -153,6 +200,216 @@ async function loadDares() {
             dashboardState.activeDares = [];
         }
     }
+}
+
+/**
+ * Load clue progress for user
+ */
+async function loadClueProgress() {
+    try {
+        dashboardState.clueProgress = await getUserClueProgress(dashboardState.userId);
+        determineCurrentClue();
+    } catch (error) {
+        console.error('Error loading clue progress:', error);
+        dashboardState.clueProgress = {
+            userId: dashboardState.userId,
+            currentClueOrder: 0,
+            completedClueIds: [],
+            waitingForOthers: false
+        };
+    }
+}
+
+/**
+ * Determine which clue the user should see
+ */
+function determineCurrentClue() {
+    if (!dashboardState.clues || dashboardState.clues.length === 0) {
+        dashboardState.currentClue = null;
+        return;
+    }
+    
+    const progress = dashboardState.clueProgress || {
+        currentClueOrder: 0,
+        completedClueIds: [],
+        waitingForOthers: false
+    };
+    
+    // If waiting for others on a person-specific clue, show that clue with waiting message
+    if (progress.waitingForOthers) {
+        const waitingClue = dashboardState.clues.find(c => 
+            c.order === progress.currentClueOrder &&
+            c.type === "person-specific" &&
+            (c.assignedTo || []).includes(dashboardState.userId)
+        );
+        if (waitingClue) {
+            dashboardState.currentClue = { ...waitingClue, waitingForOthers: true };
+            return;
+        }
+    }
+    
+    // Find the clue at the current order that should be shown to this user
+    const currentOrder = progress.currentClueOrder || 0;
+    const clueForOrder = dashboardState.clues.find(c => c.order === currentOrder);
+    
+    if (!clueForOrder) {
+        // No clue at this order, check if we've completed all clues
+        const maxOrder = Math.max(...dashboardState.clues.map(c => c.order || 0));
+        if (currentOrder > maxOrder) {
+            dashboardState.currentClue = null; // All clues completed
+            return;
+        }
+        // Try to find next available clue
+        for (let order = currentOrder; order <= maxOrder; order++) {
+            const clue = dashboardState.clues.find(c => c.order === order);
+            if (clue && shouldShowClueToUser(clue)) {
+                dashboardState.currentClue = clue;
+                return;
+            }
+        }
+        dashboardState.currentClue = null;
+        return;
+    }
+    
+    // Check if this clue should be shown to this user
+    if (shouldShowClueToUser(clueForOrder)) {
+        // For global clues, check if already completed
+        if (clueForOrder.type === "global") {
+            // Subscribe to global completion (will be handled in renderClue)
+            dashboardState.currentClue = clueForOrder;
+        } else {
+            dashboardState.currentClue = clueForOrder;
+        }
+    } else {
+        // This clue isn't for this user, try next one
+        dashboardState.currentClue = null;
+    }
+}
+
+/**
+ * Check if a clue should be shown to the current user
+ */
+function shouldShowClueToUser(clue) {
+    if (!clue) return false;
+    
+    if (clue.type === "global") {
+        // Global clues are shown to everyone
+        return true;
+    } else if (clue.type === "person-specific") {
+        // Person-specific clues only shown to assigned users
+        const assignedTo = clue.assignedTo || [];
+        return assignedTo.includes(dashboardState.userId);
+    }
+    
+    return false;
+}
+
+/**
+ * Render clue in the UI
+ */
+function renderClue() {
+    const riddleContent = document.getElementById('riddleContent');
+    const riddleHint = document.getElementById('riddleHint');
+    const hintBtn = document.getElementById('hintBtn');
+    const enterAnswerBtn = document.getElementById('enterAnswerBtn');
+    
+    if (!dashboardState.unlocked) {
+        riddleContent.textContent = 'COME BACK LATER';
+        riddleHint.style.display = 'none';
+        hintBtn.disabled = true;
+        enterAnswerBtn.disabled = true;
+        dashboardState.currentClue = null;
+        dashboardState.clueHintShown = false;
+        return;
+    }
+    
+    if (!dashboardState.currentClue) {
+        riddleContent.textContent = 'COME BACK LATER';
+        riddleHint.style.display = 'none';
+        hintBtn.disabled = true;
+        enterAnswerBtn.disabled = true;
+        return;
+    }
+    
+    const clue = dashboardState.currentClue;
+    
+    // Check if waiting for others (person-specific clue completed but others haven't)
+    if (clue.waitingForOthers || (dashboardState.clueProgress && dashboardState.clueProgress.waitingForOthers)) {
+        riddleContent.textContent = 'WAIT FOR OTHER PLAYERS TO FINISH THEIR CLUES';
+        riddleHint.style.display = 'none';
+        hintBtn.disabled = true;
+        enterAnswerBtn.disabled = true;
+        dashboardState.clueHintShown = false;
+        
+        // Subscribe to progress updates to know when others complete
+        // This is already handled by the subscription in setupRealtimeSubscriptions
+        return;
+    }
+    
+    // For global clues, check if already completed by someone else
+    if (clue.type === "global") {
+        // Check if already completed
+        getGlobalClueCompletion(clue.id).then(async (completion) => {
+            if (completion.isCompleted) {
+                // Already completed by someone else, advance to next clue
+                const progress = dashboardState.clueProgress || {};
+                const completedIds = progress.completedClueIds || [];
+                if (!completedIds.includes(clue.id)) {
+                    // Update progress in Firestore
+                    try {
+                        await updateUserClueProgress(dashboardState.userId, {
+                            completedClueIds: [...completedIds, clue.id],
+                            currentClueOrder: (clue.order || 0) + 1,
+                            waitingForOthers: false
+                        });
+                        // Reload progress to get updated state
+                        await loadClueProgress();
+                        determineCurrentClue();
+                        renderClue();
+                    } catch (error) {
+                        console.error('Error updating progress for completed global clue:', error);
+                    }
+                } else {
+                    // Already processed, just determine next clue
+                    determineCurrentClue();
+                    renderClue();
+                }
+                return;
+            }
+            
+            // Subscribe to global completion status (only if not completed)
+            subscribeToGlobalClueCompletion(clue.id, async (completionStatus) => {
+                if (completionStatus.isCompleted) {
+                    // Clue was completed by someone else, advance to next
+                    const currentProgress = dashboardState.clueProgress || {};
+                    const currentCompletedIds = currentProgress.completedClueIds || [];
+                    if (!currentCompletedIds.includes(clue.id)) {
+                        // Update progress in Firestore
+                        try {
+                            await updateUserClueProgress(dashboardState.userId, {
+                                completedClueIds: [...currentCompletedIds, clue.id],
+                                currentClueOrder: (clue.order || 0) + 1,
+                                waitingForOthers: false
+                            });
+                            // Reload progress to get updated state
+                            await loadClueProgress();
+                            determineCurrentClue();
+                            renderClue();
+                        } catch (error) {
+                            console.error('Error updating progress for global clue completion:', error);
+                        }
+                    }
+                }
+            });
+        });
+    }
+    
+    // Show the clue
+    riddleContent.textContent = clue.riddle || clue.clue || 'No clue text';
+    riddleHint.style.display = 'none';
+    dashboardState.clueHintShown = false;
+    hintBtn.disabled = false;
+    enterAnswerBtn.disabled = false;
 }
 
 /**
@@ -336,8 +593,12 @@ function updateButtonStates() {
         }
     });
     
-    // Update riddle display
-    renderRiddle();
+    // Update clue/riddle display
+    if (dashboardState.useClueSystem) {
+        renderClue();
+    } else {
+        renderRiddle();
+    }
 }
 
 /**
@@ -398,37 +659,71 @@ function closeHintModal() {
  */
 function handleConfirmHint() {
     if (!dashboardState.unlocked) return;
-    if (!dashboardState.currentRiddle) {
-        showMessage('No riddle available', 'error');
-        closeHintModal();
-        return;
-    }
     
-    // Check if hint is already shown
-    if (dashboardState.riddleHintShown) {
-        showMessage('Hint already shown', 'info');
-        closeHintModal();
-        return;
-    }
-    
-    // Deduct points for hint
-    dashboardState.points -= 30;
-    updatePointsDisplay();
-    
-    // Show hint
-    const riddleHint = document.getElementById('riddleHint');
-    if (dashboardState.currentRiddle.hint) {
-        riddleHint.textContent = `HINT: ${dashboardState.currentRiddle.hint}`;
-        riddleHint.style.display = 'block';
-        dashboardState.riddleHintShown = true;
-        closeHintModal();
-        showMessage('Hint revealed. -30 points', 'info');
-    } else {
-        showMessage('No hint available for this riddle', 'error');
-        closeHintModal();
-        // Refund points if no hint available
-        dashboardState.points += 30;
+    if (dashboardState.useClueSystem) {
+        if (!dashboardState.currentClue) {
+            showMessage('No clue available', 'error');
+            closeHintModal();
+            return;
+        }
+        // Check if hint is already shown
+        if (dashboardState.clueHintShown) {
+            showMessage('Hint already shown', 'info');
+            closeHintModal();
+            return;
+        }
+        
+        // Deduct points for hint
+        dashboardState.points -= 30;
         updatePointsDisplay();
+        
+        // Show hint
+        const riddleHint = document.getElementById('riddleHint');
+        if (dashboardState.currentClue.hint) {
+            riddleHint.textContent = `HINT: ${dashboardState.currentClue.hint}`;
+            riddleHint.style.display = 'block';
+            dashboardState.clueHintShown = true;
+            closeHintModal();
+            showMessage('Hint revealed. -30 points', 'info');
+        } else {
+            showMessage('No hint available for this clue', 'error');
+            closeHintModal();
+            // Refund points if no hint available
+            dashboardState.points += 30;
+            updatePointsDisplay();
+        }
+    } else {
+        if (!dashboardState.currentRiddle) {
+            showMessage('No riddle available', 'error');
+            closeHintModal();
+            return;
+        }
+        // Check if hint is already shown
+        if (dashboardState.riddleHintShown) {
+            showMessage('Hint already shown', 'info');
+            closeHintModal();
+            return;
+        }
+        
+        // Deduct points for hint
+        dashboardState.points -= 30;
+        updatePointsDisplay();
+        
+        // Show hint
+        const riddleHint = document.getElementById('riddleHint');
+        if (dashboardState.currentRiddle.hint) {
+            riddleHint.textContent = `HINT: ${dashboardState.currentRiddle.hint}`;
+            riddleHint.style.display = 'block';
+            dashboardState.riddleHintShown = true;
+            closeHintModal();
+            showMessage('Hint revealed. -30 points', 'info');
+        } else {
+            showMessage('No hint available for this riddle', 'error');
+            closeHintModal();
+            // Refund points if no hint available
+            dashboardState.points += 30;
+            updatePointsDisplay();
+        }
     }
 }
 
@@ -437,15 +732,33 @@ function handleConfirmHint() {
  */
 function handleRiddleHint() {
     if (!dashboardState.unlocked) return;
-    if (!dashboardState.currentRiddle) {
-        showMessage('No riddle available', 'error');
-        return;
-    }
     
-    // Check if hint is already shown
-    if (dashboardState.riddleHintShown) {
-        showMessage('Hint already shown', 'info');
-        return;
+    if (dashboardState.useClueSystem) {
+        if (!dashboardState.currentClue) {
+            showMessage('No clue available', 'error');
+            return;
+        }
+        // Check if waiting for others
+        if (dashboardState.currentClue.waitingForOthers || 
+            (dashboardState.clueProgress && dashboardState.clueProgress.waitingForOthers)) {
+            showMessage('Waiting for other players', 'info');
+            return;
+        }
+        // Check if hint is already shown
+        if (dashboardState.clueHintShown) {
+            showMessage('Hint already shown', 'info');
+            return;
+        }
+    } else {
+        if (!dashboardState.currentRiddle) {
+            showMessage('No riddle available', 'error');
+            return;
+        }
+        // Check if hint is already shown
+        if (dashboardState.riddleHintShown) {
+            showMessage('Hint already shown', 'info');
+            return;
+        }
     }
     
     // Show hint confirmation modal
@@ -457,9 +770,23 @@ function handleRiddleHint() {
  */
 function handleEnterAnswer() {
     if (!dashboardState.unlocked) return;
-    if (!dashboardState.currentRiddle) {
-        showMessage('No riddle available', 'error');
-        return;
+    
+    if (dashboardState.useClueSystem) {
+        if (!dashboardState.currentClue) {
+            showMessage('No clue available', 'error');
+            return;
+        }
+        // Check if waiting for others
+        if (dashboardState.currentClue.waitingForOthers || 
+            (dashboardState.clueProgress && dashboardState.clueProgress.waitingForOthers)) {
+            showMessage('Waiting for other players to finish their clues', 'info');
+            return;
+        }
+    } else {
+        if (!dashboardState.currentRiddle) {
+            showMessage('No riddle available', 'error');
+            return;
+        }
     }
     
     const modal = document.getElementById('answerModal');
@@ -470,7 +797,7 @@ function handleEnterAnswer() {
 /**
  * Handle submit answer
  */
-function handleSubmitAnswer() {
+async function handleSubmitAnswer() {
     const answerInput = document.getElementById('answerInput');
     const answer = answerInput.value.trim().toLowerCase();
     
@@ -479,34 +806,77 @@ function handleSubmitAnswer() {
         return;
     }
     
-    if (!dashboardState.currentRiddle) {
-        showMessage('No riddle available', 'error');
-        closeAnswerModal();
-        return;
-    }
-    
-    // Check correctness
-    const correctAnswer = (dashboardState.currentRiddle.answer || '').toLowerCase();
-    const isCorrect = answer === correctAnswer;
-    
     closeAnswerModal();
     
-    if (isCorrect) {
-        showMessage('CORRECT! Answer accepted.', 'success');
-        // Award points for correct riddle answer
-        dashboardState.points += 50;
-        updatePointsDisplay();
+    if (dashboardState.useClueSystem) {
+        // Handle clue system
+        if (!dashboardState.currentClue) {
+            showMessage('No clue available', 'error');
+            return;
+        }
         
-        // Move to next riddle in order
-        dashboardState.currentRiddleIndex++;
-        dashboardState.currentRiddle = getNextRiddle();
-        dashboardState.riddleHintShown = false;
-        renderRiddle();
+        const clue = dashboardState.currentClue;
+        const correctAnswer = (clue.answer || '').toLowerCase();
+        const isCorrect = answer === correctAnswer;
+        
+        if (isCorrect) {
+            showMessage('CORRECT! Answer accepted.', 'success');
+            // Award points for correct clue answer
+            dashboardState.points += 50;
+            updatePointsDisplay();
+            
+            // Mark clue as complete
+            try {
+                await markClueComplete(
+                    dashboardState.userId,
+                    clue.id,
+                    clue.type || 'global',
+                    clue.assignedTo || []
+                );
+                
+                // Reload progress to get updated state
+                await loadClueProgress();
+                determineCurrentClue();
+                dashboardState.clueHintShown = false;
+                renderClue();
+            } catch (error) {
+                console.error('Error marking clue complete:', error);
+                showMessage('Error updating progress', 'error');
+            }
+        } else {
+            showMessage('INCORRECT. Answer rejected.', 'error');
+            // Subtract points for incorrect answer
+            dashboardState.points -= 5;
+            updatePointsDisplay();
+        }
     } else {
-        showMessage('INCORRECT. Answer rejected.', 'error');
-        // Subtract points for incorrect answer
-        dashboardState.points -= 5;
-        updatePointsDisplay();
+        // Handle old riddle system
+        if (!dashboardState.currentRiddle) {
+            showMessage('No riddle available', 'error');
+            return;
+        }
+        
+        // Check correctness
+        const correctAnswer = (dashboardState.currentRiddle.answer || '').toLowerCase();
+        const isCorrect = answer === correctAnswer;
+        
+        if (isCorrect) {
+            showMessage('CORRECT! Answer accepted.', 'success');
+            // Award points for correct riddle answer
+            dashboardState.points += 50;
+            updatePointsDisplay();
+            
+            // Move to next riddle in order
+            dashboardState.currentRiddleIndex++;
+            dashboardState.currentRiddle = getNextRiddle();
+            dashboardState.riddleHintShown = false;
+            renderRiddle();
+        } else {
+            showMessage('INCORRECT. Answer rejected.', 'error');
+            // Subtract points for incorrect answer
+            dashboardState.points -= 5;
+            updatePointsDisplay();
+        }
     }
 }
 

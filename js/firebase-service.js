@@ -606,4 +606,374 @@ export async function deleteDrinkChoice(userId) {
     }
 }
 
+/**
+ * CLUE SYSTEM - Supports person-specific and global clues
+ */
+
+/**
+ * Get all clues from Firestore, sorted by order
+ */
+export async function getAllClues() {
+    if (!db) {
+        throw new Error("Firebase not configured");
+    }
+    
+    try {
+        const cluesRef = collection(db, "clues");
+        const q = query(cluesRef, orderBy("order", "asc"));
+        const snapshot = await getDocs(q);
+        
+        return snapshot.docs.map(doc => ({
+            id: doc.id,
+            ...doc.data()
+        }));
+    } catch (error) {
+        console.error("Error loading clues:", error);
+        throw error;
+    }
+}
+
+/**
+ * Subscribe to clues changes (real-time)
+ */
+export function subscribeToClues(callback) {
+    if (!db) {
+        console.warn("Firebase not configured - subscribeToClues not available");
+        callback([]);
+        return () => {};
+    }
+    
+    const cluesRef = collection(db, "clues");
+    const q = query(cluesRef, orderBy("order", "asc"));
+    
+    return onSnapshot(q, (snapshot) => {
+        const clues = snapshot.docs.map(doc => ({
+            id: doc.id,
+            ...doc.data()
+        }));
+        callback(clues);
+    }, (error) => {
+        console.error("Error subscribing to clues:", error);
+        callback([]);
+    });
+}
+
+/**
+ * Get user's clue progress
+ */
+export async function getUserClueProgress(userId) {
+    if (!db) {
+        throw new Error("Firebase not configured");
+    }
+    
+    try {
+        const progressRef = doc(db, "clueProgress", userId);
+        const progressDoc = await progressRef.get();
+        
+        if (progressDoc.exists()) {
+            return progressDoc.data();
+        }
+        return {
+            userId: userId,
+            currentClueOrder: 0,
+            completedClueIds: [],
+            waitingForOthers: false
+        };
+    } catch (error) {
+        console.error("Error getting user clue progress:", error);
+        throw error;
+    }
+}
+
+/**
+ * Subscribe to user's clue progress (real-time)
+ */
+export function subscribeToUserClueProgress(userId, callback) {
+    if (!db) {
+        console.warn("Firebase not configured - subscribeToUserClueProgress not available");
+        callback({ userId, currentClueOrder: 0, completedClueIds: [], waitingForOthers: false });
+        return () => {};
+    }
+    
+    const progressRef = doc(db, "clueProgress", userId);
+    
+    return onSnapshot(progressRef, (snapshot) => {
+        if (snapshot.exists()) {
+            callback(snapshot.data());
+        } else {
+            callback({ userId, currentClueOrder: 0, completedClueIds: [], waitingForOthers: false });
+        }
+    }, (error) => {
+        console.error("Error subscribing to user clue progress:", error);
+        callback({ userId, currentClueOrder: 0, completedClueIds: [], waitingForOthers: false });
+    });
+}
+
+/**
+ * Update user's clue progress (for when global clues are completed by others)
+ */
+export async function updateUserClueProgress(userId, updates) {
+    if (!db) {
+        throw new Error("Firebase not configured");
+    }
+    
+    try {
+        const progressRef = doc(db, "clueProgress", userId);
+        const currentProgress = await getUserClueProgress(userId);
+        
+        await setDoc(progressRef, {
+            ...currentProgress,
+            ...updates,
+            updatedAt: serverTimestamp()
+        }, { merge: true });
+        return true;
+    } catch (error) {
+        console.error("Error updating user clue progress:", error);
+        throw error;
+    }
+}
+
+/**
+ * Mark a clue as completed for a user
+ */
+export async function markClueComplete(userId, clueId, clueType, assignedTo = []) {
+    if (!db) {
+        throw new Error("Firebase not configured");
+    }
+    
+    try {
+        // Update user's progress
+        const progressRef = doc(db, "clueProgress", userId);
+        const progressDoc = await progressRef.get();
+        const currentProgress = progressDoc.exists() ? progressDoc.data() : {
+            userId: userId,
+            currentClueOrder: 0,
+            completedClueIds: [],
+            waitingForOthers: false
+        };
+        
+        // Add clue to completed list if not already there
+        const completedClueIds = [...(currentProgress.completedClueIds || [])];
+        if (!completedClueIds.includes(clueId)) {
+            completedClueIds.push(clueId);
+        }
+        
+        // Get the clue to find its order
+        const clueRef = doc(db, "clues", clueId);
+        const clueDoc = await clueRef.get();
+        const clue = clueDoc.data();
+        const clueOrder = clue?.order || 0;
+        
+        // Update progress
+        const updates = {
+            userId: userId,
+            completedClueIds: completedClueIds,
+            updatedAt: serverTimestamp()
+        };
+        
+        if (clueType === "person-specific") {
+            // For person-specific clues, check if all assigned users have completed
+            const allCompleted = await checkAllPersonSpecificClueCompleted(clueId, assignedTo);
+            if (!allCompleted) {
+                // User completed but others haven't - set waiting flag
+                updates.waitingForOthers = true;
+                updates.currentClueOrder = clueOrder; // Stay on this clue
+            } else {
+                // All users completed - can advance
+                updates.waitingForOthers = false;
+                updates.currentClueOrder = clueOrder + 1;
+            }
+        } else {
+            // For global clues, mark as complete globally
+            await markGlobalClueComplete(clueId, userId);
+            updates.currentClueOrder = clueOrder + 1;
+            updates.waitingForOthers = false;
+        }
+        
+        await setDoc(progressRef, updates, { merge: true });
+        return true;
+    } catch (error) {
+        console.error("Error marking clue complete:", error);
+        throw error;
+    }
+}
+
+/**
+ * Check if all users assigned to a person-specific clue have completed it
+ */
+export async function checkAllPersonSpecificClueCompleted(clueId, assignedTo) {
+    if (!db || !assignedTo || assignedTo.length === 0) {
+        return false;
+    }
+    
+    try {
+        // Check progress for all assigned users
+        for (const userId of assignedTo) {
+            const progressRef = doc(db, "clueProgress", userId);
+            const progressDoc = await progressRef.get();
+            const progress = progressDoc.exists() ? progressDoc.data() : {};
+            const completedClueIds = progress.completedClueIds || [];
+            
+            if (!completedClueIds.includes(clueId)) {
+                return false; // At least one user hasn't completed
+            }
+        }
+        return true; // All users have completed
+    } catch (error) {
+        console.error("Error checking person-specific clue completion:", error);
+        return false;
+    }
+}
+
+/**
+ * Mark a global clue as complete (affects all users)
+ */
+export async function markGlobalClueComplete(clueId, completedBy) {
+    if (!db) {
+        throw new Error("Firebase not configured");
+    }
+    
+    try {
+        const globalCompletionRef = doc(db, "globalClueCompletion", clueId);
+        await setDoc(globalCompletionRef, {
+            clueId: clueId,
+            isCompleted: true,
+            completedBy: completedBy,
+            completedAt: serverTimestamp()
+        }, { merge: true });
+        return true;
+    } catch (error) {
+        console.error("Error marking global clue complete:", error);
+        throw error;
+    }
+}
+
+/**
+ * Get global clue completion status
+ */
+export async function getGlobalClueCompletion(clueId) {
+    if (!db) {
+        return { isCompleted: false };
+    }
+    
+    try {
+        const globalCompletionRef = doc(db, "globalClueCompletion", clueId);
+        const completionDoc = await globalCompletionRef.get();
+        
+        if (completionDoc.exists()) {
+            return completionDoc.data();
+        }
+        return { isCompleted: false };
+    } catch (error) {
+        console.error("Error getting global clue completion:", error);
+        return { isCompleted: false };
+    }
+}
+
+/**
+ * Subscribe to global clue completion (real-time)
+ */
+export function subscribeToGlobalClueCompletion(clueId, callback) {
+    if (!db) {
+        callback({ isCompleted: false });
+        return () => {};
+    }
+    
+    const globalCompletionRef = doc(db, "globalClueCompletion", clueId);
+    
+    return onSnapshot(globalCompletionRef, (snapshot) => {
+        if (snapshot.exists()) {
+            callback(snapshot.data());
+        } else {
+            callback({ isCompleted: false });
+        }
+    }, (error) => {
+        console.error("Error subscribing to global clue completion:", error);
+        callback({ isCompleted: false });
+    });
+}
+
+/**
+ * Add a new clue
+ */
+export async function addClue(clueData) {
+    if (!db) {
+        throw new Error("Firebase not configured");
+    }
+    
+    try {
+        const cluesRef = collection(db, "clues");
+        const docRef = await addDoc(cluesRef, {
+            ...clueData,
+            createdAt: serverTimestamp(),
+            updatedAt: serverTimestamp()
+        });
+        return docRef.id;
+    } catch (error) {
+        console.error("Error adding clue:", error);
+        throw error;
+    }
+}
+
+/**
+ * Update a clue
+ */
+export async function updateClue(clueId, updates) {
+    if (!db) {
+        throw new Error("Firebase not configured");
+    }
+    
+    try {
+        const clueRef = doc(db, "clues", clueId);
+        await updateDoc(clueRef, {
+            ...updates,
+            updatedAt: serverTimestamp()
+        });
+        return true;
+    } catch (error) {
+        console.error("Error updating clue:", error);
+        throw error;
+    }
+}
+
+/**
+ * Delete a clue
+ */
+export async function deleteClue(clueId) {
+    if (!db) {
+        throw new Error("Firebase not configured");
+    }
+    
+    try {
+        const clueRef = doc(db, "clues", clueId);
+        await deleteDoc(clueRef);
+        return true;
+    } catch (error) {
+        console.error("Error deleting clue:", error);
+        throw error;
+    }
+}
+
+/**
+ * Get all users' clue progress (for admin)
+ */
+export async function getAllUsersClueProgress() {
+    if (!db) {
+        throw new Error("Firebase not configured");
+    }
+    
+    try {
+        const progressRef = collection(db, "clueProgress");
+        const snapshot = await getDocs(progressRef);
+        
+        return snapshot.docs.map(doc => ({
+            userId: doc.id,
+            ...doc.data()
+        }));
+    } catch (error) {
+        console.error("Error getting all users clue progress:", error);
+        throw error;
+    }
+}
+
 export { db };

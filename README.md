@@ -7,8 +7,9 @@ A terminal-style static website project built with plain HTML, CSS, and JavaScri
 ```
 operation-pahrump/
 ├── index.html          # Login page with password authentication
-├── dashboard.html      # Main dashboard with points and dares
+├── dashboard.html      # Main dashboard with points, dares, and clues
 ├── admin.html          # Admin panel (password protected)
+├── instructions.html   # Instructions page with drink voting
 ├── css/
 │   ├── style.css       # Terminal-style base styling
 │   └── dashboard.css   # Dashboard-specific styles
@@ -16,6 +17,7 @@ operation-pahrump/
 │   ├── app.js          # Login logic and authentication
 │   ├── dashboard.js    # Dashboard functionality and interactions
 │   ├── admin.js        # Admin panel logic
+│   ├── instructions.js # Instructions page logic
 │   ├── firebase-service.js   # Firebase/Firestore service module
 │   ├── firebase-setup.js     # Firebase initialization script
 │   └── firebase-config.example.js # Firebase config template (optional override)
@@ -29,9 +31,12 @@ operation-pahrump/
 
 - **Terminal-style UI** - CRT aesthetic with green text, scanlines, and flicker effects
 - **Interactive typewriter effect** - Animated text with moving cursor
-- **Points system** - Earn points through dare completion (+10 points) and riddle answers (+50 correct, -5 incorrect). Points can be negative.
+- **Points system** - Earn points through dare completion (+10 points) and clue/riddle answers (+50 correct, -5 incorrect, -30 for hints). Points can be negative.
 - **Simple dares** - One-line challenges that can be completed or trashed
-- **Clues** - Sequential clues with hints and answers (shown in order)
+- **Clue system** - Two types of clues:
+  - **Global clues**: Same clue for everyone, advances for all when one person completes it
+  - **Person-specific clues**: Individual clues per user, players must wait for others to complete before advancing
+- **Riddles** - Sequential riddles with hints and answers (shown in order) - legacy system
 - **Dashboard** - Real-time UI updates, locked/unlocked controls, dare management
 - **Firebase integration** - Real-time admin state synchronization
 - **Responsive design** - Works on desktop and mobile devices
@@ -87,9 +92,89 @@ operation-pahrump/
 
 Modern browsers (Chrome, Firefox, Safari, Edge). Requires JavaScript enabled.
 
-## Populating Dares and Riddles
+## Managing Clues, Dares, and Riddles
 
-**Note:** Both dares and riddles are primarily loaded from Firebase Firestore. The JSON files (`data/dares.json` and `data/riddles.json`) are fallbacks used when Firebase is not configured.
+**Note:** Clues, dares, and riddles are primarily loaded from Firebase Firestore. The JSON files (`data/dares.json` and `data/riddles.json`) are fallbacks used when Firebase is not configured.
+
+### Clues System (Recommended)
+
+The clue system supports two types of clues:
+- **Global clues**: All players see the same clue. When any player completes it, all players advance automatically.
+- **Person-specific clues**: Each player gets their own clue. Players must complete their clue, then wait for all assigned players to complete theirs before everyone advances.
+
+**Adding Clues via Admin Panel:**
+
+1. Go to `admin.html` and log in
+2. **Add a global clue:**
+   ```
+   clue add 1 global "What has keys but no locks?" "piano" "It's a musical instrument"
+   ```
+3. **Add a person-specific clue:**
+   ```
+   clue add 2 person "Zoe's personal clue" "answer" "hint" Zoe
+   ```
+4. **Add clues for multiple users:**
+   ```
+   clue add 2 person "Group clue" "answer" "hint" Zoe,JT,Alana
+   ```
+5. **View all clues:** `list clues`
+6. **View user progress:** `list progress`
+7. **Edit a clue:** `clue edit <clueId> <field> "<value>"`
+8. **Delete a clue:** `clue delete <clueId>`
+9. **Reset user progress:** `clue reset <userId>`
+
+**Firestore Structure:**
+```
+clues/{clueId}
+  - type: string ("global" or "person-specific")
+  - order: number (sequential order - clues shown in this order)
+  - riddle: string (the clue/riddle text)
+  - answer: string (correct answer, case-insensitive)
+  - hint: string (optional hint text)
+  - assignedTo: array (for person-specific: ["Zoe", "JT"] - empty for global)
+  - createdAt: timestamp
+  - updatedAt: timestamp
+
+clueProgress/{userId}
+  - userId: string
+  - currentClueOrder: number (current clue order the user is on)
+  - completedClueIds: array (array of completed clue document IDs)
+  - waitingForOthers: boolean (true if user completed their person-specific clue but others haven't)
+
+globalClueCompletion/{clueId}
+  - clueId: string
+  - isCompleted: boolean
+  - completedBy: string (userId who completed it)
+  - completedAt: timestamp
+```
+
+**How It Works:**
+- Clues are shown in order based on the `order` field
+- **Global clues**: When any user answers correctly, the clue is marked as complete globally and all users advance to the next clue in real-time
+- **Person-specific clues**: Each user sees only their assigned clue. When a user completes their clue:
+  - If other assigned users haven't completed theirs, the user sees "WAIT FOR OTHER PLAYERS TO FINISH THEIR CLUES"
+  - Once all assigned users complete their clues, everyone advances to the next clue
+- Progress is tracked per user in Firestore
+- Real-time updates sync across all users
+
+**Example Clue Sequence:**
+```
+# Order 1: Global clue (everyone sees the same)
+clue add 1 global "What has keys but no locks?" "piano" "musical instrument"
+
+# Order 2: Person-specific clues (each user gets their own)
+clue add 2 person "Zoe's clue: What is your favorite color?" "blue" "think sky" Zoe
+clue add 2 person "JT's clue: What is 2 + 2?" "4" "math" JT
+clue add 2 person "Alana's clue: Capital of France?" "paris" "city of light" Alana
+
+# Order 3: Another global clue
+clue add 3 global "I speak without a mouth" "echo" "sound"
+```
+
+**To Get Clue ID for Deletion:**
+1. Run `list clues` to see all clues with their IDs
+2. The ID appears in brackets: `[abc123def456]`
+3. Use that ID: `clue delete abc123def456`
 
 ### Populating via Firebase (Recommended)
 
@@ -210,18 +295,33 @@ Edit `data/riddles.json` to add your own riddles:
 
 ### How It Works
 
+**Clues (New System - Recommended):**
+- Loaded from Firebase `clues` collection
+- System automatically detects if clues exist and uses them instead of riddles
+- Two types of clues:
+  - **Global**: All players see the same clue. When one player completes it, all players advance automatically in real-time
+  - **Person-specific**: Each player sees only their assigned clue. Players wait for others to complete before advancing
+- When unlocked, players can:
+  - Click "HINT" to reveal the hint (-30 points)
+  - Click "ENTER ANSWER" to submit an answer
+  - Correct answers award +50 points and advance to the next clue
+  - Incorrect answers subtract -5 points (points can be negative)
+  - Person-specific clues show "WAIT FOR OTHER PLAYERS" message when user completes but others haven't
+- Clues update in real-time via Firebase subscriptions
+
 **Dares:**
 - Loaded from Firebase `dares` collection (or `data/dares.json` as fallback)
-- 5 random dares are shown to each player
-- Players can complete dares for +10 points or trash them
+- 3 random dares are shown to each player
+- Players can complete dares for +10 points or trash them for -5 points
 - Dares update in real-time via Firebase subscriptions
 
-**Riddles:**
+**Riddles (Legacy System):**
 - Loaded from Firebase `riddles` collection (or `data/riddles.json` as fallback)
+- Used only if no clues exist in the `clues` collection
 - Riddles are sorted by `id` and shown sequentially (in order)
 - Players see one riddle at a time in the riddle box
 - When unlocked, players can:
-  - Click "HINT" to reveal the hint
+  - Click "HINT" to reveal the hint (-30 points)
   - Click "ENTER ANSWER" to submit an answer
   - Correct answers award +50 points and advance to the next riddle
   - Incorrect answers subtract -5 points (points can be negative)
@@ -247,6 +347,18 @@ service cloud.firestore {
     match /dares/{dareId} {
       allow read, write: if true;
     }
+    match /riddles/{riddleId} {
+      allow read, write: if true;
+    }
+    match /clues/{clueId} {
+      allow read, write: if true;
+    }
+    match /clueProgress/{userId} {
+      allow read, write: if true;
+    }
+    match /globalClueCompletion/{clueId} {
+      allow read, write: if true;
+    }
   }
 }
 ```
@@ -255,10 +367,14 @@ service cloud.firestore {
 
 ### Firestore Structure
 
-- **admin/state**: Admin settings (unlocked flag)
+- **admin/state**: Admin settings (unlocked flag, canProceedToDashboard flag)
 - **users/{userId}**: User accounts with passwords (SECURE - stored in Firestore)
 - **dares/{dareId}**: Dare entries (simple challenges)
-- **riddles/{riddleId}**: Riddle entries (shown sequentially)
+- **riddles/{riddleId}**: Riddle entries (shown sequentially) - legacy system
+- **clues/{clueId}**: Clue entries (global or person-specific, shown in order)
+- **clueProgress/{userId}**: User progress tracking (current order, completed clues, waiting status)
+- **globalClueCompletion/{clueId}**: Global clue completion status (tracks when global clues are completed)
+- **drinkChoices/{choiceId}**: Drink voting choices from instructions page
 
 ### Data Storage
 
@@ -266,8 +382,12 @@ service cloud.firestore {
 - **User Management**: Firestore `users` collection (admin manages via admin panel)
 - **Points**: localStorage (per user: `points_Zoe`, `points_JT`, `points_Alana`, etc.) - can be negative
 - **Dares**: Firestore `dares` collection (for admin management and real-time updates)
-- **Riddles**: Firestore `riddles` collection (shown sequentially, real-time updates)
-- **Admin State**: Firestore (unlocked flag for real-time sync)
+- **Clues**: Firestore `clues` collection (global and person-specific clues, shown in order)
+- **Clue Progress**: Firestore `clueProgress` collection (tracks each user's progress through clues)
+- **Global Clue Completion**: Firestore `globalClueCompletion` collection (tracks when global clues are completed)
+- **Riddles**: Firestore `riddles` collection (shown sequentially, real-time updates) - legacy system
+- **Admin State**: Firestore (unlocked flag, canProceedToDashboard flag for real-time sync)
+- **Drink Choices**: Firestore `drinkChoices` collection (stores user drink votes from instructions page)
 
 **Security**: Passwords are stored in Firestore, not in code. Admin panel requires admin password to access. Firebase API keys are public (security comes from Firestore security rules).
 
@@ -275,23 +395,54 @@ service cloud.firestore {
 
 Access admin panel at `admin.html` (requires admin password):
 
+### General Commands
 - `help` - Show all commands
+- `clear` - Clear output
+- `settings` - Show admin settings
+
+### Dares Commands
 - `list` - List all dares
-- `list users` - List all users
-- `list points` or `points` - List all player points
 - `add "challenge text"` - Add a new dare (simple one-line challenge)
 - `edit <id> challenge "<value>"` - Edit dare challenge
 - `delete <id>` - Delete dare
+
+### Clues Commands (Recommended)
+- `list clues` - List all clues with IDs, order, type, and assignments
+- `clue add <order> global "riddle" "answer" "hint"` - Add a global clue
+- `clue add <order> person "riddle" "answer" "hint" users` - Add a person-specific clue
+  - Example: `clue add 1 global "What has keys?" "piano" "musical instrument"`
+  - Example: `clue add 2 person "Zoe's clue" "answer" "hint" Zoe`
+- `clue edit <id> <field> "<value>"` - Edit a clue (fields: riddle, answer, hint, order, type, assignedTo)
+- `clue delete <id>` - Delete a clue (get ID from `list clues`)
+- `list progress` - List all user clue progress
+- `clue reset <userId>` - Reset a user's clue progress
+
+### Riddles Commands (Legacy System)
+- `list riddles` - List all riddles
 - `riddle add <id> "riddle" "answer" "hint"` - Add a new riddle
 - `riddle edit <id> <field> "<value>"` - Edit riddle (field: riddle, answer, or hint)
 - `riddle delete <id>` - Delete riddle
-- `list riddles` - List all riddles
-- `user add <role>` - Add user
-- `user list` - List all users
+
+### User Commands
+- `list users` - List all users
+- `user add <role>` - Add a new user (prompts for password)
 - `user pass <id> <password>` - Change user password
-- `unlock true` / `unlock false` - Toggle unlock state
-- `settings` - Show admin settings
-- `clear` - Clear output
+- `user list` - List all users
+
+### Points and Progress
+- `list points` or `points` - List all player points
+- `list progress` - List all user clue progress
+
+### Game Control
+- `unlock true` / `unlock false` - Toggle unlock state (enables/disables clue/dare interactions)
+- `proceed true` / `proceed false` - Allow users to proceed from instructions to dashboard
+
+### Drink Choices
+- `drinks` - List all drink choices
+
+### Reset Commands
+- `reset vote <userId>` - Reset drink vote for a user
+- `clue reset <userId>` - Reset user's clue progress
 
 ## License
 

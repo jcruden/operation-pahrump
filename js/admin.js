@@ -368,8 +368,8 @@ Available commands:
   add "challenge"   - Add a new dare (simple one-line challenge)\n
   edit <id> challenge "<value>" - Edit dare challenge\n
   delete <id>       - Delete a dare by ID\n
-  riddle add <id> "riddle" "answer" "hint" - Add a new riddle\n
-  riddle edit <id> <field> "<value>" - Edit riddle (field: riddle, answer, or hint)\n
+  riddle add <id> "riddle" "answer" "hint" ["instruction"] - Add a new riddle\n
+  riddle edit <id> <field> "<value>" - Edit riddle (field: riddle, answer, hint, or instruction)\n
   riddle delete <id> - Delete a riddle by ID\n
   clue add <order> <type> "riddle" "answer" "hint" [assignedTo] - Add a clue\n
   clue edit <id> <field> "<value>" - Edit clue\n
@@ -486,6 +486,9 @@ async function displayRiddlesList() {
         sortedRiddles.forEach((riddle) => {
             const line = `[${riddle.id}] ${riddle.riddle || 'No riddle text'} -> ${riddle.answer || 'No answer'}`;
             addOutputLine(line, 'riddle');
+            if (riddle.instruction) {
+                addOutputLine(`  Instruction: ${riddle.instruction}`, 'info');
+            }
         });
     } catch (error) {
         addOutputLine(`Error loading riddles: ${error.message}`, 'error');
@@ -538,7 +541,7 @@ async function displayDrinkChoices() {
 async function handleRiddleCommand(args) {
     if (args.length < 1) {
         addOutputLine('Usage: riddle <command> [args]', 'error');
-        addOutputLine('Commands: add <id> "riddle" "answer" "hint", edit <id> <field> "<value>", delete <id>', 'info');
+        addOutputLine('Commands: add <id> "riddle" "answer" "hint" ["instruction"], edit <id> <field> "<value>", delete <id>', 'info');
         return;
     }
     
@@ -546,22 +549,27 @@ async function handleRiddleCommand(args) {
     
     if (subCmd === 'add') {
         if (args.length < 5) {
-            addOutputLine('Usage: riddle add <id> "riddle" "answer" "hint"', 'error');
-            addOutputLine('Example: riddle add 1 "What has keys?" "piano" "It\'s a musical instrument"', 'info');
+            addOutputLine('Usage: riddle add <id> "riddle" "answer" "hint" ["instruction"]', 'error');
+            addOutputLine('Example: riddle add 1 "What has keys?" "piano" "It\'s a musical instrument" "All lowercase. One word."', 'info');
             return;
         }
         const id = parseInt(args[1], 10);
         const riddle = args[2].replace(/"/g, '');
         const answer = args[3].replace(/"/g, '');
         const hint = args[4].replace(/"/g, '');
+        const instruction = args[5] ? args[5].replace(/"/g, '') : '';
         
         try {
-            await addRiddle({
+            const riddleData = {
                 id: id,
                 riddle: riddle,
                 answer: answer,
                 hint: hint
-            });
+            };
+            if (instruction) {
+                riddleData.instruction = instruction;
+            }
+            await addRiddle(riddleData);
             addOutputLine(`Riddle ${id} added successfully.`, 'success');
             await displayRiddlesList();
         } catch (error) {
@@ -570,15 +578,15 @@ async function handleRiddleCommand(args) {
     } else if (subCmd === 'edit') {
         if (args.length < 4) {
             addOutputLine('Usage: riddle edit <id> <field> "<value>"', 'error');
-            addOutputLine('Fields: riddle, answer, hint', 'info');
+            addOutputLine('Fields: riddle, answer, hint, instruction', 'info');
             return;
         }
         const riddleId = args[1];
         const field = args[2];
         const value = args.slice(3).join(' ').replace(/"/g, '');
         
-        if (!['riddle', 'answer', 'hint'].includes(field)) {
-            addOutputLine('Field must be: riddle, answer, or hint', 'error');
+        if (!['riddle', 'answer', 'hint', 'instruction'].includes(field)) {
+            addOutputLine('Field must be: riddle, answer, hint, or instruction', 'error');
             return;
         }
         

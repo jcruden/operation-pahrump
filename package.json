@@ -1,0 +1,15 @@
+{
+  "name": "operation-pahrump",
+  "version": "1.0.0",
+  "description": "Operation Pahrump - Import scripts",
+  "scripts": {
+    "import-riddles": "node import-riddles.js",
+    "import-dares": "node import-dares.js",
+    "import-clues": "node import-clues.js",
+    "import-all": "node import-riddles.js && node import-dares.js"
+  },
+  "dependencies": {
+    "firebase-admin": "^12.0.0"
+  }
+}
+

@@ -418,6 +418,23 @@ export function getUserPoints(userId) {
 }
 
 /**
+ * Set user points in localStorage
+ */
+export function setUserPoints(userId, points) {
+    localStorage.setItem(`points_${userId}`, points.toString());
+}
+
+/**
+ * Update user points (add or subtract)
+ */
+export function updateUserPoints(userId, pointsDelta) {
+    const currentPoints = getUserPoints(userId);
+    const newPoints = currentPoints + pointsDelta;
+    setUserPoints(userId, newPoints);
+    return newPoints;
+}
+
+/**
  * Get all user points (for admin view)
  */
 export function getAllUserPoints() {
@@ -426,6 +443,62 @@ export function getAllUserPoints() {
         ...user,
         points: getUserPoints(user.id)
     }));
+}
+
+/**
+ * Record shared points change for global clue (affects all users)
+ */
+export async function recordGlobalCluePointsChange(clueId, pointsDelta, actionType, userId) {
+    if (!db) {
+        // Fallback: update all users' points locally
+        const users = await getAllUsers();
+        users.forEach(user => {
+            updateUserPoints(user.id, pointsDelta);
+        });
+        return;
+    }
+    
+    try {
+        const sharedPointsRef = collection(db, "globalCluePoints");
+        await addDoc(sharedPointsRef, {
+            clueId: clueId,
+            pointsDelta: pointsDelta,
+            actionType: actionType, // 'correct', 'incorrect', 'hint'
+            userId: userId,
+            createdAt: serverTimestamp()
+        });
+    } catch (error) {
+        console.error("Error recording global clue points change:", error);
+        // Fallback: update all users' points locally
+        const users = await getAllUsers();
+        users.forEach(user => {
+            updateUserPoints(user.id, pointsDelta);
+        });
+    }
+}
+
+/**
+ * Subscribe to global clue points changes (for real-time sync)
+ */
+export function subscribeToGlobalCluePoints(callback) {
+    if (!db) {
+        callback([]);
+        return () => {};
+    }
+    
+    const sharedPointsRef = collection(db, "globalCluePoints");
+    const q = query(sharedPointsRef, orderBy("createdAt", "desc"));
+    
+    return onSnapshot(q, (snapshot) => {
+        const changes = snapshot.docs.map(doc => ({
+            id: doc.id,
+            ...doc.data()
+        }));
+        callback(changes);
+    }, (error) => {
+        console.error("Error subscribing to global clue points:", error);
+        callback([]);
+    });
 }
 
 /**

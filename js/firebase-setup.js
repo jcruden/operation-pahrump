@@ -13,7 +13,9 @@ import {
     updateAdminState, 
     addDare,
     addRiddle,
-    saveUser
+    saveUser,
+    getAllRiddles,
+    deleteRiddle
 } from './firebase-service.js';
 
 /**
@@ -89,24 +91,63 @@ export async function importDaresFromJSON() {
 }
 
 /**
- * Import riddles from JSON to Firestore
+ * Delete all riddles from Firestore
+ */
+export async function deleteAllRiddles() {
+    try {
+        const riddles = await getAllRiddles();
+        console.log(`Deleting ${riddles.length} existing riddles...`);
+        
+        for (const riddle of riddles) {
+            await deleteRiddle(riddle.id);
+            console.log(`Deleted riddle ${riddle.id}`);
+        }
+        
+        console.log('All riddles deleted successfully');
+    } catch (error) {
+        console.error('Error deleting riddles:', error);
+        throw error;
+    }
+}
+
+/**
+ * Import riddles from riddles.json to Firestore (deletes existing first)
  */
 export async function importRiddlesFromJSON() {
     try {
-        const response = await fetch('data/riddles.json');
-        const data = await response.json();
-        const riddles = data.riddles || [];
+        // First, delete all existing riddles
+        await deleteAllRiddles();
         
-        console.log(`Importing ${riddles.length} riddles...`);
+        // Then import from riddles.json
+        const response = await fetch('riddles.json');
+        if (!response.ok) {
+            throw new Error(`Failed to fetch riddles.json: ${response.statusText}`);
+        }
+        const riddles = await response.json();
         
-        for (const riddle of riddles) {
-            await addRiddle(riddle);
-            console.log(`Imported riddle ${riddle.id}: ${riddle.riddle}`);
+        if (!Array.isArray(riddles)) {
+            throw new Error('riddles.json must be an array');
+        }
+        
+        console.log(`Importing ${riddles.length} riddles from riddles.json...`);
+        
+        for (let i = 0; i < riddles.length; i++) {
+            const riddle = riddles[i];
+            const riddleData = {
+                id: i + 1, // Use 1-based index as id
+                riddle: riddle.riddle || '',
+                hint: riddle.hint || '',
+                answer: riddle.answer || '',
+                instruction: riddle.instruction || ''
+            };
+            await addRiddle(riddleData);
+            console.log(`Imported riddle ${i + 1}: ${riddleData.riddle.substring(0, 50)}...`);
         }
         
         console.log('All riddles imported successfully');
     } catch (error) {
         console.error('Error importing riddles:', error);
+        throw error;
     }
 }
 

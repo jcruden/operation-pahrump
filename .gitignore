@@ -35,3 +35,14 @@ localStorage-backup.json
 *.tmp
 *.temp
 .cache/
+
+# Game data files (contains game content)
+riddles.json
+dares.json
+
+# Firebase service account key (sensitive)
+serviceAccountKey.json
+
+# Node.js dependencies
+node_modules/
+package-lock.json

@@ -28,8 +28,7 @@ import {
     deleteClue,
     getAllUsersClueProgress,
     updateUserClueProgress,
-    setUserPoints,
-    getAllUsers
+    setUserPoints
 } from './firebase-service.js';
 
 // Admin state
